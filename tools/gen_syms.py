@@ -13,8 +13,9 @@ holding Rage Wars' own. It puts these together into one list of function starts:
 - a stack-frame setup (addiu $sp, $sp, -N) straight after a function's end;
 - the targets of every jump table the code indexes and jr's through are case labels, never starts (jump_table_targets);
 - in the gaps nothing above reaches, code that reads as a whole function (gap search);
-- the starts in the game's names file, taken as they are, and none at its labels: addresses inside hand-written code
-  that a j or a branch reaches from elsewhere in the same function, which the scans would take for a start.
+- the starts in the game's names file, taken as they are, and none at its labels: addresses inside a function that
+  the scans would take for a start, as one in hand-written code that a j or a branch reaches from elsewhere in the
+  same function, or a stack adjustment the compiler scheduled after a function's first instructions.
 
 A start that does not read as code (an invalid instruction, a write to $zero, $k0/$k1, a branch out of every segment)
 is data before a real function: the first later word that does is where that one starts.
