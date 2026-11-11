@@ -17,3 +17,7 @@ jobs:
     uses: n64hub/turok-2-recomp/.github/workflows/ci.yml@main
     with:
       engine-ref: ${{ github.sha }}
+  t1:
+    uses: n64hub/turok-recomp/.github/workflows/ci.yml@main
+    with:
+      engine-ref: ${{ github.sha }}

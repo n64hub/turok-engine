@@ -65,3 +65,11 @@ runtime, and has `recomp::make_kuseg_accessible(rdram, vaddr, size)` for a range
 server's regions must stay below 0x01000000 for that. On those runtimes `turok::make_accessible` is to call it in place
 of VirtualProtect or mprotect. The runtime this engine is pinned with on the desktop reserves the whole 4 GB, so
 VirtualProtect and mprotect do the work there.
+
+## Turok: Dinosaur Hunter
+
+The first game came before this layout. Its boot code at 0x80000400 reads the main program from the ROM, packed with
+RNC method 1, unpacks it to 0x80001300 and jumps there: all of its code runs in kseg0, with no TLB entries and no VM
+server. A game whose code is packed keeps a tool that unpacks it into a copy of the ROM for the recompiler, and its
+layout file points `rom` there (turok-recomp's `tools/unpack_main.py`); the section's ROM range is then one no DMA
+reads, so the game registers its functions itself.
