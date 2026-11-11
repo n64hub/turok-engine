@@ -11,8 +11,8 @@ them needs the same things done. What is here is written against a short list of
 Each game has this repo as a submodule, `lib/turok-engine`, pinned at a commit:
 [Turok 2: Recompiled](https://github.com/n64hub/turok-2-recomp), [Turok 3: Recompiled](https://github.com/n64hub/turok-3-recomp)
 and [Turok: Recompiled](https://github.com/n64hub/turok-recomp) so far. Turok: Dinosaur Hunter came before the family's
-TLB-mapped code and runs all of its code in kseg0, so it uses the finder, the Controller Pak, the FPU mode and
-osClockRate, and none of the TLB views or the VM server.
+TLB-mapped code and runs all of its code in kseg0, so it uses the finder, the Controller Pak, the FPU mode,
+osClockRate and widescreen, and none of the TLB views or the VM server.
 
 It holds no ROM and nothing made from one, and builds only as part of a game. Much of it began in
 [PaxDino](https://github.com/wootbeer/PaxDino) (GPL-3.0), Turok: Rage Wars' recompilation; each file taken from it
