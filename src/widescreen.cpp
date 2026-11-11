@@ -10,6 +10,7 @@
 // (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the frame's own commands instead of Rage Wars'
 // addresses.
 #include <cstdint>
+#include <cstring>
 
 #include "recomp.h"
 #include "ultramodern/config.hpp"
@@ -88,29 +89,34 @@ void turok::set_display_list_head(uint32_t address) {
     head_var = address;
 }
 
-// RT64's frame interpolation (Framerate above the game's own rate). By default (automatic components) RT64 stops
-// interpolating a matrix's position on any frame where its movement jumps tenfold over the last, so things moving
-// unevenly flip between smoothed and snapped frames. At the start of each frame the base of RT64's matrix-group stack
-// (reset every frame) gets decomposed components with automatic matching: position, rotation, scale, skew,
-// perspective and tiles always interpolated, vertices and texture coordinates not, look-at automatic.
-static uint32_t base_group_params() {
-    const uint32_t interpolate = 1, autos = 2;
-    return (1u << 2) /* decompose */ | (interpolate << 3) | (interpolate << 5) | (interpolate << 7) |
-        (interpolate << 9) | (interpolate << 11) | (interpolate << 15) /* tiles */ | (1u << 17) /* order auto */ |
-        (autos << 24);
-}
-
+// Where the frame's display list starts, which the border and the HUD look back to. Frame interpolation is RT64's own
+// matching, unchanged: forcing interpolation on with a matrix group at the frame's base tears the level's geometry
+// while the camera turns (docs/widescreen.md).
 extern "C" void turok_frame_begin(uint8_t* rdram) {
+    (void)rdram;
     frame_start = head_var != 0 ? (uint32_t)MEM_W(0, (gpr)(int32_t)head_var) : 0;
     hud_open = false;
-    if (frame_start == 0) {
+}
+
+// The camera's culling. The games test what to draw against their own view-projection matrix (a float one, the
+// camera's, which it also converts for the display list), so whatever is outside the 4:3 view isn't drawn, and the
+// sides of a widened picture are missing it. Once the display list's copy is made, the float matrix's x column is
+// scaled so its view is as wide as 21:9: the picture is unchanged and the culling lets through what a window up to that
+// wide shows.
+extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
+    if (!turok::widescreen_active() || matrix == 0) {
         return;
     }
-    Writer dl{ rdram, frame_start };
-    dl.enable();
-    dl.cmd(0x6400000C, 0xFFFFFFFF); // gEXMatrixGroup(G_EX_ID_AUTO, no push): replaces the base entry
-    dl.cmd(base_group_params(), 0);
-    dl.finish();
+    constexpr float kScale = (4.0f / 3.0f) / (21.0f / 9.0f);
+    for (uint32_t row = 0; row < 4; row++) {
+        uint32_t a = matrix + row * 16; // [row][0]: clip x = sum of v[row] * m[row][0]
+        float f;
+        uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)a);
+        std::memcpy(&f, &bits, sizeof(f));
+        f *= kScale;
+        std::memcpy(&bits, &f, sizeof(f));
+        MEM_W(0, (gpr)(int32_t)a) = (int32_t)bits;
+    }
 }
 
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right

@@ -64,6 +64,9 @@ extern "C" {
     void turok_frame_end(uint8_t* rdram);
     void turok_hud_begin(uint8_t* rdram);
     void turok_hud_end(uint8_t* rdram);
+    // widescreen.cpp: the camera's float view-projection matrix (at matrix), widened for its culling once the display
+    // list's copy is made.
+    void turok_widen_culling(uint8_t* rdram, uint32_t matrix);
 }
 
 #endif
