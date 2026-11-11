@@ -51,3 +51,18 @@ extern "C" void __osPfsRWInode_recomp(uint8_t*, recomp_context* ctx) {
 extern "C" void __osSiRawStartDma_recomp(uint8_t*, recomp_context* ctx) {
     ctx->r2 = (gpr)-1;
 }
+
+// The Status register, which Turok 3's own low-level code reads through a copy of __osGetSR (n64sym names it so).
+extern "C" void __osGetSR_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = cop0_status_read(ctx);
+}
+
+// The debug monitor's, which Turok 3's fault handling calls before it shows a crash: there is no monitor to stop
+// threads for.
+extern "C" void __rmonMaskIdleThreadInts_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = 0;
+}
+
+extern "C" void __rmonStopUserThreads_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = 0;
+}
