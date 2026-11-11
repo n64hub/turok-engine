@@ -13,7 +13,8 @@ holding Rage Wars' own. It puts these together into one list of function starts:
 - a stack-frame setup (addiu $sp, $sp, -N) straight after a function's end;
 - the targets of every jump table the code indexes and jr's through are case labels, never starts (jump_table_targets);
 - in the gaps nothing above reaches, code that reads as a whole function (gap search);
-- the starts in the game's names file, taken as they are.
+- the starts in the game's names file, taken as they are, and none at its labels: addresses inside hand-written code
+  that a j or a branch reaches from elsewhere in the same function, which the scans would take for a start.
 
 A start that does not read as code (an invalid instruction, a write to $zero, $k0/$k1, a branch out of every segment)
 is data before a real function: the first later word that does is where that one starts.
@@ -29,7 +30,7 @@ The layout file (syms/layout.toml in the game's repo):
     rom = "roms/turok2.us.z64"          # paths from the game's root
     sha1 = "..."                        # the .z64's
     out = "syms/turok2.us.syms.toml"
-    names = "syms/names.toml"           # optional: [[func]] vram = 0x..., name = "..."
+    names = "syms/names.toml"           # optional: [[func]] vram = 0x..., name = "..."; [[label]] vram = 0x...
 
     [[segment]]                         # code: its text, then its data, linked at vram
     name = "main"
@@ -135,6 +136,11 @@ class Layout:
         if self.names_path is None or not self.names_path.exists():
             return {}
         return {f["vram"]: f["name"] for f in tomllib.loads(self.names_path.read_text()).get("func", [])}
+
+    def labels(self):
+        if self.names_path is None or not self.names_path.exists():
+            return set()
+        return {f["vram"] for f in tomllib.loads(self.names_path.read_text()).get("label", [])}
 
 
 def branch_target(w, v):
@@ -360,6 +366,7 @@ class Finder:
     def find(self, spim_starts, forced):
         """[(start, end, name or None, source)] for every function, sorted. forced: {vram: name} taken as they are."""
         lay = self.lay
+        labels = lay.labels()
         starts = {}  # vram -> (name or None, source)
         data_targets = set()
         jal_sites = {}  # vram -> the jals' own addresses
@@ -367,7 +374,7 @@ class Finder:
         print(f"{len(jt_tables)} jump tables, {len(jt_targets)} case labels kept out")
 
         def add(v, src, name=None, force=False):
-            if lay.seg_of(v) is None or v & 3:
+            if lay.seg_of(v) is None or v & 3 or v in labels:
                 return
             if v in starts:
                 if name and not starts[v][0]:
