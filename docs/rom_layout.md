@@ -74,3 +74,11 @@ the web, and `recomp::make_kuseg_accessible(rdram, vaddr, size)` opens a range o
 web, the reserved pages committed natively). With the define, `turok::make_accessible` calls it; without it (a game on
 an older runtime) it opens the pages with VirtualProtect or mprotect, as that runtime commits the whole 4 GB. The TLB
 sections and the VM server's regions must stay below 0x01000000 for the web.
+
+## Turok: Dinosaur Hunter
+
+The first game came before this layout. Its boot code at 0x80000400 reads the main program from the ROM, packed with
+RNC method 1, unpacks it to 0x80001300 and jumps there: all of its code runs in kseg0, with no TLB entries and no VM
+server. A game whose code is packed keeps a tool that unpacks it into a copy of the ROM for the recompiler, and its
+layout file points `rom` there (turok-recomp's `tools/unpack_main.py`); the section's ROM range is then one no DMA
+reads, so the game registers its functions itself.

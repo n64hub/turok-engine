@@ -15,6 +15,10 @@ the folder under the game's `lib/` it applies in. Applying them again changes no
   RT64 resolves the shown framebuffer pair's colour target into the override, and read a null one when that pair has
   only a depth target, which these games' frames have: the game crashed a few seconds into its boot at MSAA 2x,
   RecompFrontend's default. The resolve now needs a colour target.
+- `rt64-3-auto-anchor-hud.patch`: an extended GBI command, gEXSetAutoAnchor (G_EX_SETAUTOANCHOR_V1, 0x34), that has
+  RT64 anchor each 2D rectangle with no alignment of its own to the side it's nearest by where it sits, or stretch it
+  across the window when it is half the screen wide or more, for the HUD in widescreen (`src/widescreen.cpp`,
+  `docs/widescreen.md`). From PaxDino.
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
