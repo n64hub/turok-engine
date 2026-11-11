@@ -45,7 +45,7 @@ The layout file (syms/layout.toml in the game's repo):
     vram = 0x80000400
     size = 0x100000
 
-Usage, from the game's root: python3 -I lib/turok-engine/tools/gen_syms.py [syms/layout.toml] [--report]
+Usage, from the game's root: python3 lib/turok-engine/tools/gen_syms.py [syms/layout.toml] [--report]
 (needs the ROM, rabbitizer and spimdisasm: pip install spimdisasm; n64sym's signatures in ref/n64sym are optional).
 """
 import argparse
@@ -64,6 +64,10 @@ import rabbitizer
 
 JR_RA = 0x03E00008
 SIGNATURES = Path("ref/n64sym/src/builtin_signatures.sig")
+# libc names the host's C library declares too and N64Recomp doesn't rename (its renamed_funcs): the generated code's
+# declaration of the game's function would conflict with the host's.
+HOST_LIBC = {"qsort", "bsearch", "abs", "labs", "atoi", "atol", "strncpy", "strncmp", "strrchr", "strstr", "vsprintf",
+             "printf", "rand", "srand"}
 
 
 def word(buf, off):
@@ -324,6 +328,21 @@ class Finder:
                 return False
         return True
 
+    def is_stray_branch(self, start, end):
+        """A few data words between one function's exit and the next function that read as a branch: no exit of their
+        own, and a branch that leaves them or one with its delay slot past their end. N64Recomp can't recompile
+        either."""
+        if end - start > 0x10 or self.has_exit(start, end):
+            return False
+        for v in range(start, end, 4):
+            w = self.lay.at(v)
+            t = branch_target(w, v)
+            if t is not None and not start <= t < end:
+                return True
+            if v + 4 == end and (t is not None or (w >> 26) in (2, 3) or (w >> 26 == 0 and (w & 0x3E) == 0x08)):
+                return True  # a branch, j, jal, jr or jalr as the last word
+        return False
+
     def skip_leading_junk(self, start, limit):
         """A stray data word right before a stack-frame setup: start after it."""
         w0 = self.lay.at(start)
@@ -415,6 +434,9 @@ class Finder:
                     else:
                         dropped += 1
                         continue
+                if "extra" not in src and self.is_stray_branch(a, end):
+                    dropped += 1
+                    continue
                 out.append((a, end, nxt, name, src))
             return out, dropped
 
@@ -546,6 +568,8 @@ def main():
             if not seg.vram <= a < seg.end:
                 continue
             name = hand.get(a) or library.get(a) or name
+            if name in HOST_LIBC:
+                name += "_n64"
             if name is None or name in used:
                 name = f"func_{a:08X}"
             used.add(name)
