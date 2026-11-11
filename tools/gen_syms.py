@@ -362,6 +362,7 @@ class Finder:
         lay = self.lay
         starts = {}  # vram -> (name or None, source)
         data_targets = set()
+        jal_sites = {}  # vram -> the jals' own addresses
         jt_targets, jt_tables = self.jump_table_targets()
         print(f"{len(jt_tables)} jump tables, {len(jt_targets)} case labels kept out")
 
@@ -394,7 +395,9 @@ class Finder:
                 w = word(self.rom, off)
                 op = w >> 26
                 if op == 3:  # jal
-                    add(jump_target(w, s.vram + off - s.rom), "jal")
+                    t = jump_target(w, s.vram + off - s.rom)
+                    jal_sites.setdefault(t, []).append(s.vram + off - s.rom)
+                    add(t, "jal")
                 elif op == 0x0F:  # lui
                     lui[(w >> 16) & 31] = (w & 0xFFFF) << 16
                 elif op in (0x09, 0x0D):  # addiu / ori
@@ -446,6 +449,24 @@ class Finder:
             return out, dropped
 
         funcs, dropped = resolve()
+        # A jal word in a data fragment can point into the middle of a function, as one before 0x00428CF0 does into
+        # an epilogue: a start that only jals found is kept if one of them sits in a function.
+        while True:
+            spans = sorted((a, end) for a, end, *_ in funcs)
+            heads = [a for a, _ in spans]
+
+            def in_code(v):
+                i = bisect.bisect_right(heads, v) - 1
+                return i >= 0 and v < spans[i][1]
+
+            stray = [v for v, (name, src) in starts.items()
+                     if src == "jal" and not any(in_code(j) for j in jal_sites.get(v, ()))]
+            if not stray:
+                break
+            for v in stray:
+                del starts[v]
+            print(f"{len(stray)} starts dropped that only jals in data reach")
+            funcs, dropped = resolve()
         # Gaps: code after a function's end that nothing above found, usually a function reached only through a
         # pointer the scans missed, behind a data fragment. In a gap that reads as a whole function (valid code ending
         # in an exit), a start is a stack-frame setup, or the target of a data word right after data. In a gap,
