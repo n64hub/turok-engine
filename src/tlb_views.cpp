@@ -22,6 +22,10 @@
 //   the TLB view of physical memory outside the exception code and osInitialize, which don't run. If that turns out
 //   wrong for a game, the fix is to back rdram with shared memory and map these ranges as real aliases.
 //
+// On the web rdram is a linear memory: a game on a runtime with KUSEG support defines RECOMP_KUSEG_WINDOW, and these
+// ranges are opened by the runtime (recomp::make_kuseg_accessible), in a 16 MB window after RDRAM on the web. Every TLB
+// section and VM region must then lie below 0x01000000.
+//
 // A game calls map_tlb_sections from its GameEntry's on_init_callback, and on_thread_create is its
 // thread_create_callback.
 #include <algorithm>
@@ -31,10 +35,11 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#else
+#elif !defined(__EMSCRIPTEN__)
 #include <sys/mman.h>
 #endif
 
+#include "librecomp/addresses.hpp"
 #include "librecomp/game.hpp"
 #include "librecomp/helpers.hpp"
 #include "librecomp/overlays.hpp"
@@ -48,6 +53,11 @@ namespace {
 }
 
 bool turok::make_accessible(uint8_t* rdram, uint32_t vaddr, uint32_t size) {
+#ifdef RECOMP_KUSEG_WINDOW
+    // A game on a runtime with KUSEG support (N64Recomp-browser v0.183.0 and later) defines this for every target: the
+    // runtime opens the range, natively by committing its reserved pages and on the web in the window after RDRAM.
+    return recomp::make_kuseg_accessible(rdram, vaddr, size);
+#else
     constexpr uint32_t page = 0x1000;
     uint32_t start = vaddr & ~(page - 1);
     uint32_t end = (vaddr + size + page - 1) & ~(page - 1);
@@ -58,6 +68,7 @@ bool turok::make_accessible(uint8_t* rdram, uint32_t vaddr, uint32_t size) {
     return VirtualProtect(host, end - start, PAGE_READWRITE, &old_protect) != 0;
 #else
     return mprotect(host, end - start, PROT_READ | PROT_WRITE) == 0;
+#endif
 #endif
 }
 
