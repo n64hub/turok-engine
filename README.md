@@ -9,7 +9,8 @@ The code the static recompilations of the N64 Turok games share, written once. A
 kseg0, has no decompilation, and drives the hardware in ways the runtime doesn't expect, so a recompilation of any of
 them needs the same things done. What is here is written against a short list of each game's own names and addresses.
 Each game has this repo as a submodule, `lib/turok-engine`, pinned at a commit:
-[Turok 2: Recompiled](https://github.com/n64hub/turok-2-recomp) so far.
+[Turok 2: Recompiled](https://github.com/n64hub/turok-2-recomp) and
+[Turok 3: Recompiled](https://github.com/n64hub/turok-3-recomp) so far.
 
 It holds no ROM and nothing made from one, and builds only as part of a game. Much of it began in
 [PaxDino](https://github.com/wootbeer/PaxDino) (GPL-3.0), Turok: Rage Wars' recompilation; each file taken from it
