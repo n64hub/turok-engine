@@ -32,6 +32,11 @@ a game only its display list head (`turok::set_display_list_head`, the address o
 through) and hooks at four places: after it starts the frame's display list (`turok_frame_begin`), before it's done
 with it (`turok_frame_end`), and before and after the HUD.
 
+The head comes with the microcode the display list is for, since RT64's extended GBI is switched on with that
+microcode's no-op: an F3DEX2's (0xE0) for Turok 2's engine family, the default, and an F3DEX's (0x00) for Turok 1. A
+game whose head isn't at one address (Turok 1's is in the graphics struct its code is handed) gives it from its frame's
+hook, before `turok_frame_begin`, once the frame's display list buffer is the one it writes.
+
 Where those are in each game is the game's own: its N64Recomp configuration's hooks say.
 
 ## Frame interpolation

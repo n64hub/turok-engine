@@ -18,6 +18,7 @@
 
 namespace {
     uint32_t head_var = 0;      // the game's display list head, a pointer in RDRAM
+    uint32_t hook_opcode = 0xE0; // the microcode's no-op, which RT64's extended GBI is switched on with
     uint32_t frame_start = 0;   // the head where this frame's display list starts
     bool hud_open = false;      // hud_begin wrote its commands, so hud_end closes them
 
@@ -43,7 +44,8 @@ namespace {
             head += 8;
         }
         void enable() {
-            cmd(0xE0525464, 0x10000064); // gEXEnable: the extended GBI on opcode 0x64 (a G_SPNOOP with RT64's magic)
+            cmd((hook_opcode << 24) | 0x525464, 0x10000064); // gEXEnable: the extended GBI on opcode 0x64 (a G_SPNOOP
+                                                              // with RT64's magic)
         }
         void finish() {
             MEM_W(0, (gpr)(int32_t)head_var) = (int32_t)head;
@@ -85,8 +87,9 @@ bool turok::widescreen_active() {
     return ultramodern::renderer::get_graphics_config().ar_option == ultramodern::renderer::AspectRatio::Expand;
 }
 
-void turok::set_display_list_head(uint32_t address) {
+void turok::set_display_list_head(uint32_t address, Microcode microcode) {
     head_var = address;
+    hook_opcode = microcode == Microcode::F3DEX ? 0x00 : 0xE0; // G_SPNOOP in each
 }
 
 // Where the frame's display list starts, which the border and the HUD look back to. Frame interpolation is RT64's own

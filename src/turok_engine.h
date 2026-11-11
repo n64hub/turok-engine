@@ -41,9 +41,12 @@ namespace turok {
     void set_accessories(Accessory (*accessory)(int port));
 
     // widescreen.cpp: true while RT64 shows the picture wider than 4:3 (Expand). The game's display list head, the
-    // address of the pointer its code writes commands through, before the game runs.
+    // address of the pointer its code writes commands through, before the game runs (or each frame, from a hook, for
+    // a game whose head moves), and the microcode the display list is for: Turok 2's engine family has an F3DEX2,
+    // Turok 1 an F3DEX, whose commands' opcodes differ.
+    enum class Microcode { F3DEX, F3DEX2 };
     bool widescreen_active();
-    void set_display_list_head(uint32_t address);
+    void set_display_list_head(uint32_t address, Microcode microcode = Microcode::F3DEX2);
 }
 
 // The natives a game names in its syms or calls from its N64Recomp hooks.
