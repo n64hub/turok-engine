@@ -24,7 +24,9 @@
 //
 // A game calls map_tlb_sections from its GameEntry's on_init_callback, and on_thread_create is its
 // thread_create_callback.
+#include <algorithm>
 #include <cstdio>
+#include <mutex>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -34,6 +36,7 @@
 #endif
 
 #include "librecomp/game.hpp"
+#include "librecomp/helpers.hpp"
 #include "librecomp/overlays.hpp"
 #include "turok_engine.h"
 
@@ -83,4 +86,46 @@ void turok::set_fpu_mode(recomp_context* ctx) {
 
 void turok::on_thread_create(uint8_t*, recomp_context* ctx) {
     set_fpu_mode(ctx);
+}
+
+// ROM-backed regions of virtual memory. The games also map data straight from ROM into TLB space and let their
+// TLB-miss pager page it in: the audio banks, through their VmMapRomRegion, which asks the VM server thread for a region
+// and gets back its virtual base. No TLB miss ever happens here, so a game names that function turok_vm_map_rom_region
+// in its syms and lists it in its N64Recomp configuration's ignored functions: each region gets the address the game's
+// server would give it, made accessible and filled from ROM at once. The game can't depend on writing to these either
+// (evicted pages are re-read from ROM). Regions are never freed: the callers are the audio-bank loads at startup.
+namespace {
+    std::mutex vm_mutex;
+    // The server hands out pages from the first one past the regions the game maps at boot, each region starting on an
+    // even page (a TLB entry maps an even/odd pair). The ROM data is linked for those addresses (an audio bank holds
+    // pointers into its own region), so regions must come in the game's order.
+    uint32_t vm_next_page = 0;
+}
+
+void turok::set_vm_base(uint32_t vaddr) {
+    std::lock_guard lock{ vm_mutex };
+    vm_next_page = vaddr >> 12;
+}
+
+// VmMapRomRegion(u32 size, unused, u32 rom_address) -> the region's virtual base
+extern "C" void turok_vm_map_rom_region(uint8_t* rdram, recomp_context* ctx) {
+    uint32_t size = (uint32_t)ctx->r4;
+    uint32_t rom = (uint32_t)ctx->r6 & 0x0FFFFFFF;
+    uint32_t rom_size = (uint32_t)recomp::get_rom().size();
+
+    std::lock_guard lock{ vm_mutex };
+    uint32_t pages = (size + 0xFFF) >> 12;
+    uint32_t base_page = (vm_next_page + 1) & ~1u;
+    uint32_t base = base_page << 12;
+    uint32_t bytes = pages << 12;
+    if (vm_next_page == 0 || pages == 0 || rom >= rom_size || base + bytes >= 0x7F000000 ||
+        !turok::make_accessible(rdram, base, bytes)) {
+        fprintf(stderr, "[turok-engine] Couldn't map ROM 0x%08X (0x%X bytes) into virtual memory\n", rom, size);
+        ctx->r2 = 0;
+        return;
+    }
+    uint32_t copy = std::min(bytes, rom_size - rom) & ~1u;
+    recomp::do_rom_read(rdram, (gpr)(int32_t)base, 0x10000000u + rom, copy);
+    vm_next_page = base_page + pages;
+    ctx->r2 = (gpr)(int32_t)base;
 }

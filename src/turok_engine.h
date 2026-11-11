@@ -20,6 +20,20 @@ namespace turok {
     // thread_create_callback, every thread's.
     void set_fpu_mode(recomp_context* ctx);
     void on_thread_create(uint8_t* rdram, recomp_context* ctx);
+
+    // tlb_views.cpp: the first virtual address the game's VM server hands a ROM region out at, past what the game maps
+    // at boot (turok_vm_map_rom_region). Before the game runs.
+    void set_vm_base(uint32_t vaddr);
+}
+
+// The natives a game names in its syms or calls from its N64Recomp hooks.
+extern "C" {
+    // tlb_views.cpp: VmMapRomRegion(size, unused, rom) -> virtual base.
+    void turok_vm_map_rom_region(uint8_t* rdram, recomp_context* ctx);
+    // pi_dma.cpp: osPiRawStartDma, the message the game's DMA thread waits for, and osClockRate.
+    void turok_pi_raw_start_dma(uint8_t* rdram, recomp_context* ctx);
+    void turok_set_pi_event(uint8_t* rdram, uint64_t mq, uint32_t msg);
+    void turok_set_clock_rate(uint8_t* rdram, uint32_t address);
 }
 
 #endif

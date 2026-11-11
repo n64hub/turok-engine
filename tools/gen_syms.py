@@ -439,9 +439,9 @@ class Finder:
         if found:
             funcs, dropped = resolve()
         print(f"{len(funcs)} functions ({found} found in gaps, {dropped} data fragments dropped)")
-        # A function runs to the next one's start: what lies between its end and that start (string fragments, an
-        # unreached tail) is N64Recomp's to skip, and a size that stops short would cut code it does reach.
-        return [(a, nxt, name, src) for a, end, nxt, name, src in funcs]
+        # A function ends at its last exit: what lies between that and the next start is the string fragments the
+        # toolchain left in the text, which N64Recomp can't read as code.
+        return [(a, end, name, src) for a, end, nxt, name, src in funcs]
 
 
 def load_signatures(root):
