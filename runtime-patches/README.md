@@ -11,6 +11,10 @@ the folder under the game's `lib/` it applies in. Applying them again changes no
   every pass took the first entry. From PaxDino.
 - `rt64-1-acclaim-f3dex2-variant.patch`: RT64 takes Acclaim's F3DEX2 variant ("F3DEX2.NoN.fifo 2.05 (Acclaim)"),
   which the games draw with, as F3DEX2 rather than unknown. From PaxDino.
+- `rt64-2-msaa-resolve-needs-a-colour-target.patch`: with MSAA on and frame interpolation's target override active,
+  RT64 resolves the shown framebuffer pair's colour target into the override, and read a null one when that pair has
+  only a depth target, which these games' frames have: the game crashed a few seconds into its boot at MSAA 2x,
+  RecompFrontend's default. The resolve now needs a colour target.
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).

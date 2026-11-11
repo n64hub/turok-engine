@@ -67,8 +67,9 @@ entries that never return are the only ones that should.
 ## The web
 
 A web build runs the same code in WebAssembly, where rdram is a linear memory, not a 4 GB reservation with pages to
-open. The runtime's web support maps kuseg's first 16 MB when a game defines `RECOMP_KUSEG_WINDOW` before adding the
-runtime, and has `recomp::make_kuseg_accessible(rdram, vaddr, size)` for a range in it; the TLB sections and the VM
-server's regions must stay below 0x01000000 for that. On those runtimes `turok::make_accessible` is to call it in place
-of VirtualProtect or mprotect. The runtime this engine is pinned with on the desktop reserves the whole 4 GB, so
-VirtualProtect and mprotect do the work there.
+open. N64Recomp-browser's runtime (v0.183.0 and later) has a KUSEG window for it: a game that defines
+`RECOMP_KUSEG_WINDOW` for every target, before adding the runtime, gets kuseg's first 16 MB in a window after RDRAM on
+the web, and `recomp::make_kuseg_accessible(rdram, vaddr, size)` opens a range on every platform (the window on the
+web, the reserved pages committed natively). With the define, `turok::make_accessible` calls it; without it (a game on
+an older runtime) it opens the pages with VirtualProtect or mprotect, as that runtime commits the whole 4 GB. The TLB
+sections and the VM server's regions must stay below 0x01000000 for the web.

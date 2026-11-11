@@ -18,7 +18,8 @@ namespace turok {
     // registers its functions there. From the GameEntry's on_init_callback, with N64Recomp's section_table.
     void map_tlb_sections(uint8_t* rdram, const SectionTableEntry* sections, size_t count);
 
-    // Makes [vaddr, vaddr + size), rounded out to whole pages, readable and writable in rdram's reservation.
+    // Makes [vaddr, vaddr + size), rounded out to whole pages, readable and writable in rdram's reservation (with
+    // RECOMP_KUSEG_WINDOW defined, through the runtime's recomp::make_kuseg_accessible, which the web build needs).
     bool make_accessible(uint8_t* rdram, uint32_t vaddr, uint32_t size);
 
     // The FPU in FR mode, as the console's boot code leaves it: on_init_callback's context and, as the GameEntry's
