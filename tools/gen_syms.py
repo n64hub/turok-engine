@@ -417,6 +417,14 @@ class Finder:
                 if is_frame_setup(word(self.rom, off)) and self.ends_function(v, after_data=True):
                     add(v, "frame")
 
+        # A start in the delay slot of a jr $ra is hand-written assembly's entry (Turok 3's RNC unpacker shares its
+        # first instruction with the end of the wrapper that calls it), so the word after it is that function's
+        # second instruction, not the next function, though it follows a function's end as one would.
+        for v in [v for v in starts if lay.seg_of(v - 4) is lay.seg_of(v) and lay.at(v - 4) == JR_RA]:
+            nxt = starts.get(v + 4)
+            if nxt and not set(nxt[1].split(",")) & {"extra", "jal"}:
+                del starts[v + 4]
+
         def resolve():
             out, dropped = [], 0
             addrs = sorted(starts)
