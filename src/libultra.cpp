@@ -46,3 +46,8 @@ extern "C" void __osContRamWrite_recomp(uint8_t*, recomp_context* ctx) {
 extern "C" void __osPfsRWInode_recomp(uint8_t*, recomp_context* ctx) {
     ctx->r2 = PFS_ERR_NOPACK;
 }
+
+// The SI's raw DMA, which the same pak code calls to talk to the controllers itself: no device answers it here.
+extern "C" void __osSiRawStartDma_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = (gpr)-1;
+}

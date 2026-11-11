@@ -178,6 +178,9 @@ class Finder:
             return True
         if not after_data:
             return False
+        # Hand-written assembly (noreorder) starts a function in the delay slot of the one before's jr $ra.
+        if word(self.rom, off - 4) == JR_RA:
+            return True
         if not rabbitizer.Instruction(word(self.rom, off - 4)).isValid():
             return True
         return sum(0x20 <= b < 0x7F for b in self.rom[off - 8:off]) >= 5  # string fragments
@@ -346,6 +349,8 @@ class Finder:
     def skip_leading_junk(self, start, limit):
         """A stray data word right before a stack-frame setup: start after it."""
         w0 = self.lay.at(start)
+        if start + 4 < limit and is_frame_setup(w0) and is_frame_setup(self.lay.at(start + 4)):
+            return start + 4  # no function sets up its frame twice: the first is data that reads as one
         if start + 4 < limit and not is_frame_setup(w0) and is_frame_setup(self.lay.at(start + 4)):
             t = branch_target(w0, start)
             if (t is not None and not (start < t < limit)) or (w0 >> 26) in (2, 3):

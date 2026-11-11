@@ -18,8 +18,14 @@
 // emulator's larger pak) has its files moved to one bank when the game initializes it, if they fit. Each write is whole: to
 // <file>.tmp, renamed over the file, and a file that is a symlink, as when saves are shared through a synced folder,
 // has the file it points at replaced and stays a link.
+//
+// Each port holds one accessory, a Controller Pak or a Rumble Pak (turok::set_accessories, a Controller Pak in port 1
+// unless the game says otherwise). The games probe a port with osMotorInit first and try osPfsInitPak only when that
+// fails, so a game names its osMotorInit turok_motor_init in its syms and lists it in its N64Recomp configuration's
+// ignored functions: it answers as the port's accessory would, and the runtime's osMotorInit drives a Rumble Pak.
 
 #include <array>
+#include <atomic>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -31,13 +37,17 @@
 
 #include "recomp.h"
 #include "librecomp/game.hpp"
+#include "turok_engine.h"
 
 namespace {
 
+constexpr int PFS_ERR_NOPACK = 1;
 constexpr int PFS_ERR_INVALID = 5;
 constexpr int PFS_DATA_FULL = 7;
 constexpr int PFS_DIR_FULL = 8;
 constexpr int PFS_ERR_EXIST = 9;
+constexpr int PFS_ERR_ID_FATAL = 10;
+constexpr int PFS_ERR_DEVICE = 11;
 constexpr int PFS_INITIALIZED = 1;
 
 constexpr size_t page_size = 256;
@@ -316,13 +326,52 @@ int find_note(uint8_t* rdram, Pak& pak, uint16_t company, uint32_t game_code, gp
     return -1;
 }
 
+turok::Accessory controller_pak_in_port_1(int port) {
+    return port == 0 ? turok::Accessory::ControllerPak : turok::Accessory::None;
+}
+
+std::atomic<turok::Accessory (*)(int)> accessory_in{ controller_pak_in_port_1 };
+
 } // namespace
+
+void turok::set_accessories(Accessory (*accessory)(int port)) {
+    accessory_in = accessory;
+}
+
+extern "C" void osMotorInit_recomp(uint8_t* rdram, recomp_context* ctx);
+
+// s32 osMotorInit(OSMesgQueue* mq, OSPfs* pfs, int channel)
+extern "C" void turok_motor_init(uint8_t* rdram, recomp_context* ctx) {
+    switch (accessory_in.load()((int)ctx->r6)) {
+    case turok::Accessory::RumblePak:
+        osMotorInit_recomp(rdram, ctx);
+        return;
+    case turok::Accessory::ControllerPak:
+        // What a Controller Pak answers: the bank select reads back as no motor.
+        ctx->r2 = PFS_ERR_DEVICE;
+        return;
+    case turok::Accessory::None:
+        ctx->r2 = PFS_ERR_NOPACK;
+        return;
+    }
+}
 
 // s32 osPfsInitPak(OSMesgQueue* mq, OSPfs* pfs, int channel)
 extern "C" void osPfsInitPak_recomp(uint8_t* rdram, recomp_context* ctx) {
-    std::lock_guard lock{ pak_mutex };
     gpr pfs = ctx->r5;
     int channel = (int)ctx->r6;
+    switch (accessory_in.load()(channel)) {
+    case turok::Accessory::RumblePak:
+        // What a Rumble Pak's unreadable ID area gives.
+        ctx->r2 = PFS_ERR_ID_FATAL;
+        return;
+    case turok::Accessory::None:
+        ctx->r2 = PFS_ERR_NOPACK;
+        return;
+    case turok::Accessory::ControllerPak:
+        break;
+    }
+    std::lock_guard lock{ pak_mutex };
     Pak& pak = get_pak(channel);
 
     int banks = wanted_banks();
