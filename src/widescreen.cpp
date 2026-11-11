@@ -1,4 +1,4 @@
-// Widescreen and frame interpolation: what RT64 needs from a Turok game's own display list (docs/widescreen.md).
+// Widescreen: what RT64 needs from a Turok game's own display list and camera (docs/widescreen.md).
 //
 // RT64 widens the 3D by itself. What it can't know is the game's 2D: the HUD, which it keeps in the middle 4:3 unless
 // the display list anchors it to the window's sides, and the border the games draw round the screen, whose fill
@@ -6,9 +6,9 @@
 // its frame (frame_begin, frame_end, and the HUD between hud_begin and hud_end), and the engine writes RT64's extended
 // GBI into the game's display list there: around the HUD, a scissor as wide as the window and automatic anchoring
 // (runtime-patches/rt64-3-auto-anchor-hud.patch), and at the end of the frame, the border's side rectangles taken out.
-// Both only while the picture is wider than 4:3. After PaxDino's src/game/widescreen.cpp
-// (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the frame's own commands instead of Rage Wars'
-// addresses.
+// From its camera, the matrix its culling reads, which the engine widens. All only while the picture is wider than
+// 4:3. After PaxDino's src/game/widescreen.cpp (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the
+// frame's own commands instead of Rage Wars' addresses.
 #include <cstdint>
 #include <cstring>
 

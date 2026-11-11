@@ -29,3 +29,18 @@ through) and hooks at four places: after it starts the frame's display list (`tu
 with it (`turok_frame_end`), and before and after the HUD.
 
 Where those are in each game is the game's own: its N64Recomp configuration's hooks say.
+
+## Frame interpolation
+
+RT64 interpolates the frames between the game's own (Framerate above Original) by matching each frame's matrices to
+the last's by itself. The engine leaves that alone: a matrix group at the base of the frame's display list that forces
+position, rotation and the rest to interpolate tears the level's geometry while the camera turns, where RT64's own
+matching shows none.
+
+## The culling
+
+The games leave out whatever lies outside their own 4:3 view, so a widened picture would be missing it at its sides,
+walls stopping short of the window's edge while the camera turns. They test it against the camera's float
+view-projection matrix, from which they also make the display list's. A game hooks its camera after that copy is made
+and calls `turok_widen_culling` with the float matrix's address: its x column is scaled to a view as wide as 21:9, so
+the picture is as before and the culling lets through what a window up to that wide shows. Only while Expand is on.
