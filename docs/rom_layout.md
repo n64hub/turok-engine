@@ -24,19 +24,27 @@ alias of the same bytes at 0x80000400 (`[[alias]]`), where N64Recomp reads the j
   bytes there from the ROM, and registers its functions at their TLB addresses for calls through pointers. The pages
   are copies, not aliases of physical memory; the games write neither their code nor data through the TLB view.
 
+Turok 3's program is longer than that MB: its boot code copies the next 512 KB of the ROM to 0x80100400 itself,
+reading the cartridge bus word by word, and the code and data run to 0x80114B60 (0x00314B60 through the TLB). The
+runtime can't read the bus, so the game makes that copy before it runs and jumps over the loop; its `main` segment is
+the whole program.
+
 ## More code: 0x00400000
 
 Turok 2 keeps a second block of code in the ROM (ROM 0x14A000 on) that its VM setup maps with TLB entry 0 at
-0x00400000. It is another segment in the layout file. Its jump tables are in the first MB's rodata, so the alias covers
-them too. Other games of the family have more blocks like it; each is a segment.
+0x00400000: the game DMAs it from the ROM into the top of an Expansion Pak's memory and maps it there (Turok 3's is
+the ROM straight after its program, mapped with 1 MB pages). It is another segment in the layout file. Its jump
+tables are in the first MB's rodata, so the alias covers them too. Other games of the family have more blocks like
+it; each is a segment.
 
 ## ROM regions the VM server maps
 
 The game's VM server maps regions of the ROM (levels, models, sounds) into TLB space on demand, and its pager fills a
 page from the ROM on each TLB miss. The engine has no TLB misses: the game's VmMapRomRegion is replaced by
-`turok_vm_map_rom_region`, which hands out the next free range from the base the game sets (`turok::set_vm_base`,
-0x00480000 in Turok 2, past the code), makes it accessible and copies the region in at once. Nothing is ever unmapped
-(`osUnmapTLB` does nothing).
+`turok_vm_map_rom_region`, which hands out the next free range from the base the game sets (`turok::set_vm_base`:
+0x00480000 in Turok 2, 0x00800000 in Turok 3), makes it accessible and copies the region in at once. A region holds
+pointers into itself, linked for where the game's server puts it, so the base is where the game's first region's
+pointers point. Nothing is ever unmapped (`osUnmapTLB` does nothing).
 
 ## The FPU
 

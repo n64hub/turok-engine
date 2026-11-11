@@ -12,7 +12,10 @@ holding Rage Wars' own. It puts these together into one list of function starts:
   j or a b, and its delay slot), so the case labels of switches stay out;
 - a stack-frame setup (addiu $sp, $sp, -N) straight after a function's end;
 - the targets of every jump table the code indexes and jr's through are case labels, never starts (jump_table_targets);
-- in the gaps nothing above reaches, code that reads as a whole function (gap search);
+- in the gaps nothing above reaches, code that reads as a whole function (gap search), and each word of data there
+  that points at code as the data's do;
+- in a segment the layout calls packed, a few words of code between two functions: a leaf of its own, or the next
+  one's first instructions, scheduled ahead of its stack-frame setup;
 - the starts in the game's names file, taken as they are, and none at its labels: addresses inside a function that
   the scans would take for a start, as one in hand-written code that a j or a branch reaches from elsewhere in the
   same function, or a stack adjustment the compiler scheduled after a function's first instructions.
@@ -40,6 +43,8 @@ The layout file (syms/layout.toml in the game's repo):
     text_end = 0x...                    # ROM offset where the text ends
     data_end = 0x...                    # ROM offset where the segment's data in ROM ends
     library = true                      # match libultra's signatures here (optional)
+    packed = true                       # nothing but code and data between its functions, so a few words of code
+                                        # between two take a start (optional; see Finder.find)
 
     [[alias]]                           # the same bytes at another address, with no functions: N64Recomp reads
     name = "main_kseg0"                 # the jump tables the code reaches through kseg0 from it
@@ -84,6 +89,7 @@ class Segment:
         self.text_end = d["text_end"]
         self.data_end = d["data_end"]
         self.library = d.get("library", False)
+        self.packed = d.get("packed", False)
 
     @property
     def text_size(self):
@@ -185,6 +191,9 @@ class Finder:
             return True
         if not after_data:
             return False
+        # Data padded with zero words up to the start (Turok 3's second block has data between its functions).
+        if off < s.rom_of(vram):
+            return True
         # Hand-written assembly (noreorder) starts a function in the delay slot of the one before's jr $ra.
         if word(self.rom, off - 4) == JR_RA:
             return True
@@ -425,6 +434,14 @@ class Finder:
                 if is_frame_setup(word(self.rom, off)) and self.ends_function(v, after_data=True):
                     add(v, "frame")
 
+        # A start in the delay slot of a jr $ra is hand-written assembly's entry (Turok 3's RNC unpacker shares its
+        # first instruction with the end of the wrapper that calls it), so the word after it is that function's
+        # second instruction, not the next function, though it follows a function's end as one would.
+        for v in [v for v in starts if lay.seg_of(v - 4) is lay.seg_of(v) and lay.at(v - 4) == JR_RA]:
+            nxt = starts.get(v + 4)
+            if nxt and not set(nxt[1].split(",")) & {"extra", "jal"}:
+                del starts[v + 4]
+
         def resolve():
             out, dropped = [], 0
             addrs = sorted(starts)
@@ -478,10 +495,22 @@ class Finder:
         # Gaps: code after a function's end that nothing above found, usually a function reached only through a
         # pointer the scans missed, behind a data fragment. In a gap that reads as a whole function (valid code ending
         # in an exit), a start is a stack-frame setup, or the target of a data word right after data. In a gap,
-        # neither can split a function.
+        # neither can split a function. A gap runs to the next function kept, not the next start: a start dropped as
+        # data would otherwise end it (one at 0x0041000C hid 20 KB of Turok 3's second block, a function in it too).
         found = 0
-        for a, end, nxt, name, src in funcs:
+        kept = sorted(a for a, *_ in funcs)
+        for a, end, _, name, src in funcs:
+            i = bisect.bisect_right(kept, a)
+            seg_end = lay.seg_of(a).end
+            nxt = min(kept[i], seg_end) if i < len(kept) else seg_end
             p = end
+            for q in range(end, nxt, 4):  # data between functions, as in Turok 3's second block, points at code too
+                v = lay.at(q)
+                if v not in starts:
+                    add(v, "data")
+                    if v in starts:
+                        data_targets.add(v)
+                        found += 1
             while p < nxt:
                 if p not in jt_targets and (is_frame_setup(lay.at(p)) or (
                         p in data_targets and self.ends_function(p, after_data=True))):
@@ -494,7 +523,34 @@ class Finder:
                 p += 4
         if found:
             funcs, dropped = resolve()
-        print(f"{len(funcs)} functions ({found} found in gaps, {dropped} data fragments dropped)")
+        # Code between a function's end and the next start, a few words of it, that every scan above passed over. GCC
+        # schedules a function's first loads ahead of its stack-frame setup, so a function found by its frame setup can
+        # start a few words before it; and a leaf reached only through a pointer made at run time reads as a whole
+        # function in front of the next. Only in a segment the layout calls packed: Turok 2's first MB has stale code
+        # between its library functions, which reads the same. Words that are all valid code, with no padding and no
+        # use of $sp.
+        between = 0
+        for (a, end, *_), (b, _, _, _, bsrc) in zip(funcs, funcs[1:]):
+            seg = lay.seg_of(end)
+            if not end < b <= end + 0x20 or seg is not lay.seg_of(b) or not seg.packed or end in starts:
+                continue
+            ws = [lay.at(x) for x in range(end, b, 4)]
+            ins = [rabbitizer.Instruction(w, vram=x) for w, x in zip(ws, range(end, b, 4))]
+            if any(w == 0 or not i.isValid() or 29 in ((w >> 21) & 31, (w >> 16) & 31, (w >> 11) & 31)
+                   for w, i in zip(ws, ins)):
+                continue
+            flow = [i.isBranch() or i.isJump() for i in ins]
+            if len(ws) >= 2 and ws[-2] == JR_RA and not any(flow[:-2]):
+                starts[end] = (None, "between")  # a leaf of its own
+            elif not any(flow) and not set(bsrc.split(",")) & {"extra", "jal", "ptr", "data"}:
+                starts[end] = starts.pop(b)  # the next function's first instructions
+            else:
+                continue
+            between += 1
+        if between:
+            funcs, dropped = resolve()
+        print(f"{len(funcs)} functions ({found} found in gaps, {between} between functions, {dropped} data fragments "
+              "dropped)")
         # A function ends at its last exit: what lies between that and the next start is the string fragments the
         # toolchain left in the text, which N64Recomp can't read as code.
         return [(a, end, name, src) for a, end, nxt, name, src in funcs]
