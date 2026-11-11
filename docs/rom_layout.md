@@ -33,8 +33,8 @@ the whole program.
 
 Turok 2 keeps a second block of code in the ROM (ROM 0x14A000 on) that its VM setup maps with TLB entry 0 at
 0x00400000: the game DMAs it from the ROM into the top of an Expansion Pak's memory and maps it there (Turok 3's is
-the ROM straight after its program, mapped with 1 MB pages). It is another segment in the layout file. Its jump tables are in the first MB's rodata, so the alias covers
-them too. Other games of the family have more blocks like it; each is a segment.
+the ROM straight after its program, mapped with 1 MB pages). It is another segment in the layout file. Its jump
+tables are in the first MB's rodata, so the alias covers them too. Other games of the family have more blocks like it; each is a segment.
 
 ## ROM regions the VM server maps
 
