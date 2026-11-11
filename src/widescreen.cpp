@@ -1,4 +1,4 @@
-// Widescreen: what RT64's Expand aspect ratio needs from a Turok game's own display list (docs/widescreen.md).
+// Widescreen and frame interpolation: what RT64 needs from a Turok game's own display list (docs/widescreen.md).
 //
 // RT64 widens the 3D by itself. What it can't know is the game's 2D: the HUD, which it keeps in the middle 4:3 unless
 // the display list anchors it to the window's sides, and the border the games draw round the screen, whose fill
@@ -88,9 +88,29 @@ void turok::set_display_list_head(uint32_t address) {
     head_var = address;
 }
 
+// RT64's frame interpolation (Framerate above the game's own rate). By default (automatic components) RT64 stops
+// interpolating a matrix's position on any frame where its movement jumps tenfold over the last, so things moving
+// unevenly flip between smoothed and snapped frames. At the start of each frame the base of RT64's matrix-group stack
+// (reset every frame) gets decomposed components with automatic matching: position, rotation, scale, skew,
+// perspective and tiles always interpolated, vertices and texture coordinates not, look-at automatic.
+static uint32_t base_group_params() {
+    const uint32_t interpolate = 1, autos = 2;
+    return (1u << 2) /* decompose */ | (interpolate << 3) | (interpolate << 5) | (interpolate << 7) |
+        (interpolate << 9) | (interpolate << 11) | (interpolate << 15) /* tiles */ | (1u << 17) /* order auto */ |
+        (autos << 24);
+}
+
 extern "C" void turok_frame_begin(uint8_t* rdram) {
     frame_start = head_var != 0 ? (uint32_t)MEM_W(0, (gpr)(int32_t)head_var) : 0;
     hud_open = false;
+    if (frame_start == 0) {
+        return;
+    }
+    Writer dl{ rdram, frame_start };
+    dl.enable();
+    dl.cmd(0x6400000C, 0xFFFFFFFF); // gEXMatrixGroup(G_EX_ID_AUTO, no push): replaces the base entry
+    dl.cmd(base_group_params(), 0);
+    dl.finish();
 }
 
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right

@@ -36,6 +36,8 @@ says so.
   a Rumble Pak), which the games probe with osMotorInit first (`turok_motor_init`).
 - `src/libultra.cpp`: the libultra functions the games link that N64Recomp leaves out and the runtime lacks (the
   thread queues, the pak's raw reads, osUnmapTLB).
+- `src/widescreen.cpp`: what RT64's widescreen (Expand) needs from the game's display list: the HUD anchored to the
+  window's sides and the border at the old 4:3 edges taken out (`docs/widescreen.md`).
 - `src/turok_engine.h`: all of the above, as a game calls it.
 - `runtime-patches/`: changes to N64Recomp and RT64 every Turok game needs (`runtime-patches/README.md`).
 
@@ -62,7 +64,8 @@ Anything else the games share comes here when a change needs it in more than one
   `.thread_create_callback = turok::on_thread_create`. Its on_init_callback calls `turok::set_fpu_mode`, then
   `turok::map_tlb_sections` with N64Recomp's section table and `turok::set_vm_base` with the first address its VM
   server hands out. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. A game with
-  another accessory than a Controller Pak in port 1 calls `turok::set_accessories`.
+  another accessory than a Controller Pak in port 1 calls `turok::set_accessories`, and one that supports widescreen
+  calls `turok::set_display_list_head` and hooks its frame and HUD (`docs/widescreen.md`).
 
 ## Changing it
 
