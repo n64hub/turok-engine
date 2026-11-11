@@ -40,9 +40,10 @@ them too. Other games of the family have more blocks like it; each is a segment.
 
 The game's VM server maps regions of the ROM (levels, models, sounds) into TLB space on demand, and its pager fills a
 page from the ROM on each TLB miss. The engine has no TLB misses: the game's VmMapRomRegion is replaced by
-`turok_vm_map_rom_region`, which hands out the next free range from the base the game sets (`turok::set_vm_base`,
-past the code: 0x00480000 in Turok 2, 0x00500000 in Turok 3), makes it accessible and copies the region in at once. Nothing is ever unmapped
-(`osUnmapTLB` does nothing).
+`turok_vm_map_rom_region`, which hands out the next free range from the base the game sets (`turok::set_vm_base`:
+0x00480000 in Turok 2, 0x00800000 in Turok 3), makes it accessible and copies the region in at once. A region holds
+pointers into itself, linked for where the game's server puts it, so the base is where the game's first region's
+pointers point. Nothing is ever unmapped (`osUnmapTLB` does nothing).
 
 ## The FPU
 
