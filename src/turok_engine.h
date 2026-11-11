@@ -39,6 +39,11 @@ namespace turok {
     // controller_pak.cpp: what each controller port (0-3) holds. A Controller Pak in port 1 unless a game sets its own.
     enum class Accessory { None, ControllerPak, RumblePak };
     void set_accessories(Accessory (*accessory)(int port));
+
+    // widescreen.cpp: true while RT64 shows the picture wider than 4:3 (Expand). The game's display list head, the
+    // address of the pointer its code writes commands through, before the game runs.
+    bool widescreen_active();
+    void set_display_list_head(uint32_t address);
 }
 
 // The natives a game names in its syms or calls from its N64Recomp hooks.
@@ -53,6 +58,12 @@ extern "C" {
     void turok_ai_get_status(uint8_t* rdram, recomp_context* ctx);
     // controller_pak.cpp: osMotorInit, answered as the port's accessory would.
     void turok_motor_init(uint8_t* rdram, recomp_context* ctx);
+    // widescreen.cpp, from a game's hooks: once its frame's display list has started (frame_begin) and before it's
+    // sent (frame_end), and before and after its HUD (hud_begin, hud_end). Each does nothing outside Expand.
+    void turok_frame_begin(uint8_t* rdram);
+    void turok_frame_end(uint8_t* rdram);
+    void turok_hud_begin(uint8_t* rdram);
+    void turok_hud_end(uint8_t* rdram);
 }
 
 #endif
