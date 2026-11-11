@@ -65,3 +65,8 @@ extern "C" void __osResetGlobalIntMask_recomp(uint8_t*, recomp_context*) {
 extern "C" void osEPiRawWriteIo_recomp(uint8_t*, recomp_context* ctx) {
     ctx->r2 = 0;
 }
+
+// The Status register, which Turok 3's own low-level code reads through a copy of __osGetSR (n64sym names it so).
+extern "C" void __osGetSR_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = cop0_status_read(ctx);
+}
