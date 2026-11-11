@@ -39,7 +39,7 @@ diff --git a/src/hle/rt64_rdp.cpp b/src/hle/rt64_rdp.cpp
 index f6072e1..badaf10 100644
 --- a/src/hle/rt64_rdp.cpp
 +++ b/src/hle/rt64_rdp.cpp
-@@ -1126,6 +1126,53 @@ namespace RT64 {
+@@ -1126,6 +1126,64 @@ namespace RT64 {
          extended.global.rect = extAlignment;
      }
  
@@ -48,7 +48,8 @@ index f6072e1..badaf10 100644
 +    }
 +
 +    // Anchors a HUD rectangle to the nearest screen edge when automatic
-+    // anchoring is on and the rectangle has no alignment of its own:
++    // anchoring is on and the rectangle has no alignment of its own: one
++    // half the screen wide or more stretches across the window, and smaller
 +    // rectangles in the top quarter go to the side they're on, the bottom
 +    // quarter's to the left (or right, past 60% of the width), and anything
 +    // in between (crosshair, messages, menus) stays centred. Right-anchored
@@ -60,6 +61,17 @@ index f6072e1..badaf10 100644
 +
 +        const int32_t width = int32_t(colorImage.width) * 4;
 +        const int32_t height = (width * 3) / 4;
++        ExtendedAlignment result = extAlignment;
++        // Half the screen wide or more (a tint over the whole view, a
++        // cutscene's black bars): stretched across the window instead, its
++        // sides as far from the window's edges as from the screen's.
++        if ((lrx - ulx) * 2 >= width) {
++            result.leftOrigin = G_EX_ORIGIN_LEFT;
++            result.rightOrigin = G_EX_ORIGIN_RIGHT;
++            result.rightOffset -= width;
++            return result;
++        }
++
 +        const int32_t cx = (ulx + lrx) / 2;
 +        const int32_t cy = (uly + lry) / 2;
 +        uint16_t origin = G_EX_ORIGIN_NONE;
@@ -76,7 +88,6 @@ index f6072e1..badaf10 100644
 +            origin = (cx < (width * 3) / 5) ? G_EX_ORIGIN_LEFT : G_EX_ORIGIN_RIGHT;
 +        }
 +
-+        ExtendedAlignment result = extAlignment;
 +        if (origin == G_EX_ORIGIN_LEFT) {
 +            result.leftOrigin = G_EX_ORIGIN_LEFT;
 +            result.rightOrigin = G_EX_ORIGIN_LEFT;
@@ -93,7 +104,7 @@ index f6072e1..badaf10 100644
      void RDP::setScissorAlign(const ExtendedAlignment &extAlignment) {
          extended.global.scissor = extAlignment;
      }
-@@ -1156,6 +1203,7 @@ namespace RT64 {
+@@ -1156,6 +1214,7 @@ namespace RT64 {
          extended.global.rect = ExtendedAlignment();
          extended.global.scissor = ExtendedAlignment();
          extended.global.rectAspect = G_EX_ASPECT_AUTO;
@@ -101,7 +112,7 @@ index f6072e1..badaf10 100644
      }
      
      void RDP::drawTris(uint32_t triCount, const float *pos, const float *tc, const float *col, uint8_t tile, uint8_t levels) {
-@@ -1233,7 +1281,8 @@ namespace RT64 {
+@@ -1233,7 +1292,8 @@ namespace RT64 {
          drawRect(ulx, uly, lrx, lry, uls, ult, dsdx, dtdy, flip, extended.global.rect);
      }
      
