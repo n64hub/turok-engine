@@ -478,9 +478,14 @@ class Finder:
         # Gaps: code after a function's end that nothing above found, usually a function reached only through a
         # pointer the scans missed, behind a data fragment. In a gap that reads as a whole function (valid code ending
         # in an exit), a start is a stack-frame setup, or the target of a data word right after data. In a gap,
-        # neither can split a function.
+        # neither can split a function. A gap runs to the next function kept, not the next start: a start dropped as
+        # data would otherwise end it (one at 0x0041000C hid 20 KB of Turok 3's second block, a function in it too).
         found = 0
-        for a, end, nxt, name, src in funcs:
+        kept = sorted(a for a, *_ in funcs)
+        for a, end, _, name, src in funcs:
+            i = bisect.bisect_right(kept, a)
+            seg_end = lay.seg_of(a).end
+            nxt = min(kept[i], seg_end) if i < len(kept) else seg_end
             p = end
             while p < nxt:
                 if p not in jt_targets and (is_frame_setup(lay.at(p)) or (
