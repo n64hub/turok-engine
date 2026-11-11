@@ -356,6 +356,19 @@ extern "C" void turok_motor_init(uint8_t* rdram, recomp_context* ctx) {
     }
 }
 
+// s32 osPfsIsPlug(OSMesgQueue* mq, u8* pattern): a bit for each port with a pak in it, of either kind, as the
+// controllers' status reports one. Turok: Dinosaur Hunter asks before it opens its Controller Pak save.
+extern "C" void osPfsIsPlug_recomp(uint8_t* rdram, recomp_context* ctx) {
+    uint8_t pattern = 0;
+    for (int port = 0; port < 4; port++) {
+        if (accessory_in.load()(port) != turok::Accessory::None) {
+            pattern |= (uint8_t)(1 << port);
+        }
+    }
+    MEM_B(0, ctx->r5) = (int8_t)pattern;
+    ctx->r2 = 0;
+}
+
 // s32 osPfsInitPak(OSMesgQueue* mq, OSPfs* pfs, int channel)
 extern "C" void osPfsInitPak_recomp(uint8_t* rdram, recomp_context* ctx) {
     gpr pfs = ctx->r5;

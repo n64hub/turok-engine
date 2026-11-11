@@ -47,7 +47,21 @@ extern "C" void __osPfsRWInode_recomp(uint8_t*, recomp_context* ctx) {
     ctx->r2 = PFS_ERR_NOPACK;
 }
 
+// The address CRC the same pak code sends with each read and write.
+extern "C" void __osContAddressCrc_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = 0;
+}
+
 // The SI's raw DMA, which the same pak code calls to talk to the controllers itself: no device answers it here.
 extern "C" void __osSiRawStartDma_recomp(uint8_t*, recomp_context* ctx) {
     ctx->r2 = (gpr)-1;
+}
+
+// The PI manager's cartridge-interrupt path (__osDevMgrMain), which a game links but never runs: the runtime's
+// osCreatePiManager takes the place of the one that would start that thread.
+extern "C" void __osResetGlobalIntMask_recomp(uint8_t*, recomp_context*) {
+}
+
+extern "C" void osEPiRawWriteIo_recomp(uint8_t*, recomp_context* ctx) {
+    ctx->r2 = 0;
 }
