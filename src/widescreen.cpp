@@ -10,6 +10,7 @@
 // 4:3. And from the same matrix, at any width, a camera cut, whose frame RT64 is told not to interpolate the view into
 // (Frame interpolation in docs/widescreen.md). After PaxDino's src/game/widescreen.cpp (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the
 // frame's own commands instead of Rage Wars' addresses.
+#include <chrono> // DEBUG
 #include <cmath>
 #include <cstdio>  // DEBUG
 #include <cstdlib> // DEBUG
@@ -77,10 +78,12 @@ namespace {
     uint32_t camera_count = 0; // cameras seen since the last frame was sent
     bool camera_cut = false;   // one of them cut to another shot
 
-    // Further than a camera goes in a frame of the game's own, or turned further: a cut. The player turns at most
-    // about 15 degrees a frame and runs ...; the cutscenes' cuts move it ...
-    constexpr float kCutDistance = 1e30f;
-    constexpr float kCutCosine = -2.0f;
+    // Further than a camera goes in a frame of the game's own, or turned further: a cut. In Turok 1 the player's eye
+    // moves up to about 12 units a frame and turns about 6 degrees, and the first level's fly-over flies about 100;
+    // the cuts of its intro and of the fly-over's start and end jump 240 to 7700 units, some turning 67 to 169
+    // degrees. A turn past 45 degrees in a frame of the game's own is also a cut.
+    constexpr float kCutDistance = 160.0f;
+    constexpr float kCutCosine = 0.70710678f; // cos(45 degrees)
 
     bool read_view(uint8_t* rdram, uint32_t matrix, View* view) {
         float m[4][4];
@@ -130,9 +133,8 @@ namespace {
             if (moved > kCutDistance || turned < kCutCosine) {
                 camera_cut = true;
             }
-            if (std::getenv("TUROK_CUT_LOG")) {
-                fprintf(stderr, "cut-log cam %u moved %.2f turned %.2f deg%s
-", index, moved,
+            if (std::getenv("TUROK_CUT_LOG") && (moved > 50.0f || turned < 0.99f)) {
+                fprintf(stderr, "cut-log %lld cam %u moved %.2f turned %.2f deg%s\n", (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count(), index, moved,
                         std::acos(std::fmax(-1.0f, std::fmin(1.0f, turned))) * 57.29578f, camera_cut ? " CUT" : "");
             }
         }
@@ -320,7 +322,7 @@ extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t co
 // new shot, where they drew the camera partway between the two: Turok 1's Campaigner death scene showed, between a
 // rooftop and a hall, a flat tan field with one pillar.
 extern "C" void turok_frame_end(uint8_t* rdram) {
-    if (camera_cut && cut_slot != 0) {
+    if (camera_cut && cut_slot != 0 && !std::getenv("TUROK_CUT_OFF")) {
         Writer dl{ rdram, cut_slot };
         dl.enable();
         dl.cmd(0x6400000C, 0); // gEXMatrixGroupNoInterpolate(G_EX_NOPUSH, G_MTX_PROJECTION, G_EX_EDIT_NONE): the id
