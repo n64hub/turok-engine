@@ -9,7 +9,8 @@ holding Rage Wars' own. It puts these together into one list of function starts:
 - spimdisasm's functions in each segment's text;
 - every jal target, and each code address built with lui and addiu (or ori);
 - each word in a segment's data that points at code, where the code before the target ends a function (a jr $ra, a
-  j or a b, and its delay slot), so the case labels of switches stay out;
+  j or a b, and its delay slot), so the case labels of switches stay out, or where the target is hand-written code's
+  entry in the delay slot of a jr $ra;
 - a stack-frame setup (addiu $sp, $sp, -N) straight after a function's end;
 - the targets of every jump table the code indexes and jr's through are case labels, never starts (jump_table_targets);
 - in the gaps nothing above reaches, code that reads as a whole function (gap search), and each word of data there
@@ -171,6 +172,10 @@ def is_frame_setup(w):
     return (w >> 16) == 0x27BD and bool(w & 0x8000)  # addiu $sp, $sp, -N
 
 
+def is_frame_pop(w):
+    return (w >> 16) == 0x27BD and not w & 0x8000 and bool(w & 0xFFFF)  # addiu $sp, $sp, N
+
+
 class Finder:
     def __init__(self, lay):
         self.lay = lay
@@ -200,6 +205,12 @@ class Finder:
         if not rabbitizer.Instruction(word(self.rom, off - 4)).isValid():
             return True
         return sum(0x20 <= b < 0x7F for b in self.rom[off - 8:off]) >= 5  # string fragments
+
+    def delay_slot_entry(self, vram, data_targets):
+        """vram, in a jr $ra's delay slot, can be an entry: it pops no stack frame and no data points past it."""
+        lay = self.lay
+        return (lay.seg_of(vram - 4) is lay.seg_of(vram) and lay.at(vram - 4) == JR_RA
+                and not is_frame_pop(lay.at(vram)) and vram + 4 not in data_targets)
 
     def jump_table_targets(self):
         """The entries of every jump table the code indexes and then jr's through: {case labels}, {jr: [entries]}.
@@ -378,7 +389,7 @@ class Finder:
         lay = self.lay
         labels = lay.labels()
         starts = {}  # vram -> (name or None, source)
-        data_targets = set()
+        data_targets = {word(self.rom, off) for s in lay.segments for off in range(s.text_end, s.data_end - 3, 4)}
         jal_sites = {}  # vram -> the jals' own addresses
         jt_targets, jt_tables = self.jump_table_targets()
         print(f"{len(jt_tables)} jump tables, {len(jt_targets)} case labels kept out")
@@ -393,9 +404,13 @@ class Finder:
             if not force and src != "jal" and v in jt_targets:
                 return
             # Data fragments sit in front of some functions, so a start after data is taken on stronger evidence: a
-            # pointer made in code, or a target that opens with a stack-frame setup.
+            # pointer made in code, a target that opens with a stack-frame setup, or hand-written code's entry in the
+            # delay slot of a jr $ra (Turok 2's 0x0041A4D0, which falls into 0x0041A4D4). A word of data that only
+            # happens to equal an address in a delay slot is not one: the slot pops the stack frame (Turok 3's
+            # 0x002F0030), or data points at the word after it, which is then the function (Turok 2's 0x00210004).
             if not force and src in ("ptr", "data") and not self.ends_function(
-                    v, after_data=(src == "ptr" or is_frame_setup(lay.at(v)))):
+                    v, after_data=(src == "ptr" or is_frame_setup(lay.at(v))
+                                   or self.delay_slot_entry(v, data_targets))):
                 return
             starts[v] = (name, src)
 
@@ -428,7 +443,6 @@ class Finder:
                     lui = {}  # forget them across a function's end
             for off in range(s.text_end, s.data_end - 3, 4):  # data words pointing at code
                 add(word(self.rom, off), "data")
-                data_targets.add(word(self.rom, off))
             for off in range(s.rom + 8, s.text_end, 4):  # a frame setup right after a function's end
                 v = s.vram + off - s.rom
                 if is_frame_setup(word(self.rom, off)) and self.ends_function(v, after_data=True):
