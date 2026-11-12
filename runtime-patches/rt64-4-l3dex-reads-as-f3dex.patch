@@ -1,0 +1,88 @@
+diff --git a/src/gbi/rt64_gbi.cpp b/src/gbi/rt64_gbi.cpp
+--- a/src/gbi/rt64_gbi.cpp
++++ b/src/gbi/rt64_gbi.cpp
+@@ -145,10 +145,10 @@ namespace RT64 {
+     const GBIInstance   S2DEX2_XBUS_2_06          = { "S2DEX2.xbus 2.06",                          GBIUCode::S2DEX2,      { false,  false,  false,  false,  false } }; // Needs confirmation.
+     const GBIInstance   S2DEX2_XBUS_2_08          = { "S2DEX2.xbus 2.08",                          GBIUCode::S2DEX2,      { false,  false,  false,  false,  false } }; // Needs confirmation.
+     const GBIInstance   L3D_BC                    = { "2.0D, 04-01-96 (L3D Blast Corps)",          GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
+-    const GBIInstance   L3DEX_1_00                = { "L3DEX 1.00",                                GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
+-    const GBIInstance   L3DEX_1_21                = { "L3DEX 1.21",                                GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
+-    const GBIInstance   L3DEX_1_23                = { "L3DEX 1.23",                                GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
+-    const GBIInstance   L3DEX_1_23_A              = { "L3DEX 1.23 (Variant)",                      GBIUCode::Unknown,     { false,  false,  false,  false,  false } }; // Needs confirmation.
++    const GBIInstance   L3DEX_1_00                = { "L3DEX 1.00",                                GBIUCode::L3DEX,       { false,  false,  false,  false,  false } }; // Needs confirmation.
++    const GBIInstance   L3DEX_1_21                = { "L3DEX 1.21",                                GBIUCode::L3DEX,       { false,  false,  false,  false,  false } }; // Needs confirmation.
++    const GBIInstance   L3DEX_1_23                = { "L3DEX 1.23",                                GBIUCode::L3DEX,       { false,  false,  false,  false,  false } }; // Needs confirmation.
++    const GBIInstance   L3DEX_1_23_A              = { "L3DEX 1.23 (Variant)",                      GBIUCode::L3DEX,       { false,  false,  false,  false,  false } }; // Needs confirmation.
+     const GBIInstance   L3DEX2_FIFO_2_05          = { "L3DEX2.fifo 2.05",                          GBIUCode::L3DEX2,      { false,  false,  false,  false,  false } }; // Needs confirmation.
+     const GBIInstance   L3DEX2_FIFO_2_06          = { "L3DEX2.fifo 2.06",                          GBIUCode::L3DEX2,      { false,  false,  false,  false,  false } };
+     const GBIInstance   L3DEX2_FIFO_ACCLAIM       = { "L3DEX2.fifo 2.05 (Acclaim)",                GBIUCode::L3DEX2,      { false,  false,  false,  false,  false } }; // Needs confirmation.
+@@ -515,6 +515,9 @@ namespace RT64 {
+             case GBIUCode::S2DEX2:
+                 GBI_S2DEX2::setup(&gbi);
+                 break;
++            case GBIUCode::L3DEX:
++                GBI_L3DEX::setup(&gbi);
++                break;
+             case GBIUCode::L3DEX2:
+                 GBI_L3DEX2::setup(&gbi);
+                 break;
+diff --git a/src/gbi/rt64_gbi.h b/src/gbi/rt64_gbi.h
+--- a/src/gbi/rt64_gbi.h
++++ b/src/gbi/rt64_gbi.h
+@@ -27,6 +27,7 @@ namespace RT64 {
+         F3DZEX2,
+         S2DEX,
+         S2DEX2,
++        L3DEX,
+         L3DEX2,
+         Count
+     };
+diff --git a/src/gbi/rt64_gbi_l3dex2.cpp b/src/gbi/rt64_gbi_l3dex2.cpp
+--- a/src/gbi/rt64_gbi_l3dex2.cpp
++++ b/src/gbi/rt64_gbi_l3dex2.cpp
+@@ -4,9 +4,24 @@
+ 
+ #include "rt64_gbi_l3dex2.h"
+ 
++#include "rt64_gbi_f3dex.h"
+ #include "rt64_gbi_f3dex2.h"
+ 
+ namespace RT64 {
++    namespace GBI_L3DEX {
++        void line3D(State *state, DisplayList **dl) {
++            // Lines aren't drawn yet, as with L3DEX2. What matters is that the rest of the list is read as the
++            // microcode reads it: as an unknown microcode only the RDP's commands were, so a list switching to it
++            // never found its end and the interpreter ran on through RDRAM until it faulted.
++        }
++
++        void setup(GBI *gbi) {
++            GBI_F3DEX::setup(gbi);
++
++            gbi->map[L3DEX_G_LINE3D] = &line3D;
++        }
++    }
++
+     namespace GBI_L3DEX2 {
+         void line3D(State *state, DisplayList **dl) {
+             assert(false);
+diff --git a/src/gbi/rt64_gbi_l3dex2.h b/src/gbi/rt64_gbi_l3dex2.h
+--- a/src/gbi/rt64_gbi_l3dex2.h
++++ b/src/gbi/rt64_gbi_l3dex2.h
+@@ -6,9 +6,17 @@
+ 
+ #include "rt64_gbi.h"
+ 
++#define L3DEX_G_LINE3D 0xB5
+ #define L3DEX2_G_LINE3D 0x08
+ 
+ namespace RT64 {
++    // L3DEX 1.x, F3DEX's line microcode: F3DEX's commands, with G_LINE3D where F3DEX has G_QUAD.
++    namespace GBI_L3DEX {
++        void line3D(State *state, DisplayList **dl);
++
++        void setup(GBI *gbi);
++    };
++
+     namespace GBI_L3DEX2 {
+         void line3D(State *state, DisplayList **dl);
+ 

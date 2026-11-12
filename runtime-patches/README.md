@@ -19,6 +19,11 @@ the folder under the game's `lib/` it applies in. Applying them again changes no
   RT64 anchor each 2D rectangle with no alignment of its own to the side it's nearest by where it sits, or stretch it
   across the window when it is half the screen wide or more, for the HUD in widescreen (`src/widescreen.cpp`,
   `docs/widescreen.md`). From PaxDino.
+- `rt64-4-l3dex-reads-as-f3dex.patch`: RT64 reads display lists for L3DEX 1.x, F3DEX's line microcode, with F3DEX's
+  commands, and takes its G_LINE3D (0xB5, F3DEX's G_QUAD) as drawing nothing, as it already does for L3DEX2's. It knew
+  L3DEX 1.x by its hash, but as an unknown microcode, which gave it only the RDP's commands: a list that loaded it never
+  reached its end, a branch or the load back to F3DEX, and the interpreter ran on through RDRAM until it faulted. Turok
+  1 draws its map with L3DEX 1.00, and crashed a few seconds after L opened the map. The map's lines aren't drawn yet.
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
