@@ -70,6 +70,9 @@ extern "C" {
     // widescreen.cpp: the camera's float view-projection matrix (at matrix), widened for its culling once the display
     // list's copy is made.
     void turok_widen_culling(uint8_t* rdram, uint32_t matrix);
+    // widescreen.cpp: the camera's view pyramid in its own space (count points of three floats, at points), widened as
+    // the matrix is before it's moved into the world.
+    void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t count);
 }
 
 #endif
