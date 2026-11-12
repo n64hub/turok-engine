@@ -36,7 +36,11 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   HUD, and with no black bars above and below a widened picture they are black strips along the window's top and
   bottom edges (2-3 rows each in a 1000-high window). The frame's display list is read from where
   `turok_frame_begin` found the head to its G_ENDDL, not to the head: a game may write a second list somewhere else
-  before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines.
+  before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines. A
+  G_ENDDL that the command before it branches past (a G_DL that doesn't push, to the command after it) is never
+  reached, so the list is read on: Turok 3's cutscenes end each piece of their list that way, and draw their
+  letterbox after them, with a 1-2 pixel border down each side of the picture between its bars (x 0-2 and 282-283 of
+  284) that stayed as two black lines inside the widened picture.
 - Also at the end of the frame, and before the HUD: the screen's last column and row. Turok 2's full-screen scissor is
   (0,0)-(479,359) on a 480x360 screen (its last pixel, where the RDP wants its size), so it never draws column 479 or
   row 359. At 4:3 they are black beside the window's black bars, but RT64 scales the scissor with the widened screen,

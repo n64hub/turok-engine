@@ -20,6 +20,7 @@ namespace {
     uint32_t head_var = 0;      // the game's display list head, a pointer in RDRAM
     uint32_t hook_opcode = 0xE0; // the microcode's no-op, which RT64's extended GBI is switched on with
     uint32_t end_opcode = 0xDF;  // the microcode's G_ENDDL
+    uint32_t dl_opcode = 0xDE;   // the microcode's G_DL
     uint32_t frame_start = 0;   // the head where this frame's display list starts
     bool hud_open = false;      // hud_begin wrote its commands, so hud_end closes them
 
@@ -66,7 +67,9 @@ namespace {
 
     // Where the frame's own display list ends: at its G_ENDDL, before the head if the head is still in it. A game can go
     // on to write a second list somewhere else before the frame is done, and the head is then in that one: Turok 2's
-    // map, drawn over the frame as lines in a list of its own.
+    // map, drawn over the frame as lines in a list of its own. A G_ENDDL the command before it branches past (a
+    // G_DL that doesn't push, to the command after the G_ENDDL) is never reached, and the list goes on after it: Turok
+    // 3's cutscenes end each piece of their list so, and draw their letterbox's border after them.
     bool frame_list_end(uint8_t* rdram, uint32_t* end) {
         uint32_t head;
         bool in_frame = head_valid(rdram, &head);
@@ -76,6 +79,10 @@ namespace {
         uint32_t limit = in_frame ? head : frame_start + kMaxFrameBytes;
         for (uint32_t a = frame_start; a < limit; a += 8) {
             if ((read(rdram, a).w0 >> 24) == end_opcode) {
+                Command before = a > frame_start ? read(rdram, a - 8) : Command{ 0, 0 };
+                if ((before.w0 >> 24) == dl_opcode && ((before.w0 >> 16) & 0xFF) == 1 && before.w1 == a + 8) {
+                    continue;
+                }
                 *end = a + 8;
                 return true;
             }
@@ -146,6 +153,7 @@ void turok::set_display_list_head(uint32_t address, Microcode microcode) {
     head_var = address;
     hook_opcode = microcode == Microcode::F3DEX ? 0x00 : 0xE0; // G_SPNOOP in each
     end_opcode = microcode == Microcode::F3DEX ? 0xB8 : 0xDF;  // G_ENDDL in each
+    dl_opcode = microcode == Microcode::F3DEX ? 0x06 : 0xDE;   // G_DL in each
 }
 
 // Where the frame's display list starts, which the border and the HUD look back to. Frame interpolation is RT64's own
