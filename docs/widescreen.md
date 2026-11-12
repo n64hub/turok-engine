@@ -31,12 +31,16 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   of the screen high or more, at the left or right edge, becomes a no-op. The frame's display list is read from where
   `turok_frame_begin` found the head to its G_ENDDL, not to the head: a game may write a second list somewhere else
   before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines.
-- Also at the end of the frame: the screen's last column. Turok 2's full-screen scissor is (0,0)-(479,359) on a 480-wide
-  colour image, so it never draws column 479. At 4:3 that column is black beside the window's black sides, but RT64
-  scales the scissor's right edge with the widened screen, and the column becomes a black strip down the window's
-  right edge, 8 pixels wide in a 3840-wide window. Each G_SETSCISSOR from the screen's left edge to one pixel short of
-  the colour image it draws to is opened to the image's edge, and the HUD's scissor reaches the window's right edge.
+- Also at the end of the frame, and before the HUD: the screen's last column and row. Turok 2's full-screen scissor is
+  (0,0)-(479,359) on a 480x360 screen (its last pixel, where the RDP wants its size), so it never draws column 479 or
+  row 359. At 4:3 they are black beside the window's black bars, but RT64 scales the scissor with the widened screen,
+  and they become black strips along the window's right edge (8 pixels wide in a 3840-wide window) and bottom edge
+  (3 rows in a 1000-high one). Each G_SETSCISSOR from the screen's top left corner to one pixel short of the colour
+  image's width is opened to the image's edge and a row lower: the colour image doesn't say its height, and a scissor
+  a column short is a row short too. The HUD's scissor reaches the window's right edge and the screen's bottom.
   RT64 then widens a rectangle that ends a pixel short of the scissor to it, as it does with "Fix LR with Scissor".
+  It sizes a framebuffer by the rows drawn to it and writes back that many, so it now reads and writes all 360 rows
+  of Turok 2's 480x360 framebuffers, which is their size: nothing past them is touched.
 
 The screen's size is the frame's widest G_SETSCISSOR, which the games set before they draw, so the engine needs from
 a game only its display list head (`turok::set_display_list_head`, the address of the pointer its code writes commands
