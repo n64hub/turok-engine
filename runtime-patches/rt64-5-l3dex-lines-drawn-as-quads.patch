@@ -1,0 +1,276 @@
+diff --git a/src/gbi/rt64_gbi_l3dex2.cpp b/src/gbi/rt64_gbi_l3dex2.cpp
+index f6c4a63..1ced68e 100644
+--- a/src/gbi/rt64_gbi_l3dex2.cpp
++++ b/src/gbi/rt64_gbi_l3dex2.cpp
+@@ -10,9 +10,8 @@
+ namespace RT64 {
+     namespace GBI_L3DEX {
+         void line3D(State *state, DisplayList **dl) {
+-            // Lines aren't drawn yet, as with L3DEX2. What matters is that the rest of the list is read as the
+-            // microcode reads it: as an unknown microcode only the RDP's commands were, so a list switching to it
+-            // never found its end and the interpreter ran on through RDRAM until it faulted.
++            // gSPLineW3D: the two ends' indices, doubled, and the width, in the second word.
++            state->rsp->drawIndexedLine((*dl)->p1(17, 7), (*dl)->p1(9, 7), (*dl)->p1(0, 8));
+         }
+ 
+         void setup(GBI *gbi) {
+@@ -24,7 +23,8 @@ namespace RT64 {
+ 
+     namespace GBI_L3DEX2 {
+         void line3D(State *state, DisplayList **dl) {
+-            assert(false);
++            // gSPLineW3D: the two ends' indices, doubled, and the width, in the first word.
++            state->rsp->drawIndexedLine((*dl)->p0(17, 7), (*dl)->p0(9, 7), (*dl)->p0(0, 8));
+         }
+ 
+         void setup(GBI *gbi) {
+diff --git a/src/gui/rt64_debugger_inspector.cpp b/src/gui/rt64_debugger_inspector.cpp
+index 3298c06..72f53dc 100644
+--- a/src/gui/rt64_debugger_inspector.cpp
++++ b/src/gui/rt64_debugger_inspector.cpp
+@@ -778,10 +778,10 @@ namespace RT64 {
+         if ((modifyCount > 0) && ImGui::CollapsingHeader("Modify")) {
+             ImGui::Indent();
+             for (size_t m = 0; m < modifyCount; m++) {
+-                const bool modifyZ = drawData.modifyPosUints[m * 2] & 0x1;
+-                const uint32_t modifyIndex = drawData.modifyPosUints[m * 2] >> 1;
++                const uint32_t modifyType = drawData.modifyPosUints[m * 2] & 0x3;
++                const uint32_t modifyIndex = drawData.modifyPosUints[m * 2] >> 2;
+                 const uint32_t modifyValue = drawData.modifyPosUints[m * 2 + 1];
+-                ImGui::Text(modifyZ ? "Modify Z" : "Modify XY");
++                ImGui::Text((modifyType == 2) ? "Line corner" : ((modifyType == 1) ? "Modify Z" : "Modify XY"));
+                 ImGui::SameLine();
+                 ImGui::Text("#%u: %u (Raw value)", modifyIndex, modifyValue);
+             }
+diff --git a/src/hle/rt64_rsp.cpp b/src/hle/rt64_rsp.cpp
+index 720d561..9580272 100644
+--- a/src/hle/rt64_rsp.cpp
++++ b/src/hle/rt64_rsp.cpp
+@@ -734,6 +734,48 @@ namespace RT64 {
+         }
+     }
+ 
++    uint32_t RSP::copyVertex(uint32_t globalIndex) {
++        const int workloadCursor = state->ext.workloadQueue->writeCursor;
++        Workload &workload = state->ext.workloadQueue->workloads[workloadCursor];
++        auto &normColBytes = workload.drawData.normColBytes;
++        auto &tcFloats = workload.drawData.tcFloats;
++        auto &tcVelFloats = workload.drawData.tcVelFloats;
++        auto &fogIndices = workload.drawData.fogIndices;
++        auto &lightIndices = workload.drawData.lightIndices;
++        auto &lightCounts = workload.drawData.lightCounts;
++        auto &lookAtIndices = workload.drawData.lookAtIndices;
++        auto &posScreen = workload.drawData.posScreen;
++        auto &posFloats = workload.drawData.posFloats;
++        auto &velFloats = workload.drawData.velFloats;
++        auto &viewProjIndices = workload.drawData.viewProjIndices;
++        auto &worldIndices = workload.drawData.worldIndices;
++        auto &posTransformed = workload.drawData.posTransformed;
++        const uint32_t newIndex = workload.drawData.vertexCount();
++        posFloats.emplace_back(posFloats[globalIndex * 3 + 0]);
++        posFloats.emplace_back(posFloats[globalIndex * 3 + 1]);
++        posFloats.emplace_back(posFloats[globalIndex * 3 + 2]);
++        velFloats.emplace_back(velFloats[globalIndex * 3 + 0]);
++        velFloats.emplace_back(velFloats[globalIndex * 3 + 1]);
++        velFloats.emplace_back(velFloats[globalIndex * 3 + 2]);
++        normColBytes.emplace_back(normColBytes[globalIndex * 4 + 0]);
++        normColBytes.emplace_back(normColBytes[globalIndex * 4 + 1]);
++        normColBytes.emplace_back(normColBytes[globalIndex * 4 + 2]);
++        normColBytes.emplace_back(normColBytes[globalIndex * 4 + 3]);
++        tcFloats.emplace_back(tcFloats[globalIndex * 2 + 0]);
++        tcFloats.emplace_back(tcFloats[globalIndex * 2 + 1]);
++        tcVelFloats.emplace_back(tcVelFloats[globalIndex * 2 + 0]);
++        tcVelFloats.emplace_back(tcVelFloats[globalIndex * 2 + 1]);
++        viewProjIndices.emplace_back(viewProjIndices[globalIndex]);
++        worldIndices.emplace_back(worldIndices[globalIndex]);
++        fogIndices.emplace_back(fogIndices[globalIndex]);
++        lightIndices.emplace_back(lightIndices[globalIndex]);
++        lightCounts.emplace_back(lightCounts[globalIndex]);
++        lookAtIndices.emplace_back(lookAtIndices[globalIndex]);
++        posTransformed.emplace_back(posTransformed[globalIndex]);
++        posScreen.emplace_back(posScreen[globalIndex]);
++        return newIndex;
++    }
++
+     void RSP::modifyVertex(uint16_t dstIndex, uint16_t dstAttribute, uint32_t value) {
+         if (dstIndex >= RSP_MAX_VERTICES) {
+             assert(false && "Vertex index is not valid. DL is possibly corrupted.");
+@@ -754,37 +796,9 @@ namespace RT64 {
+         auto &posScreen = workload.drawData.posScreen;
+         uint32_t globalIndex = indices[dstIndex];
+         if (used[dstIndex]) {
+-            auto &posFloats = workload.drawData.posFloats;
+-            auto &velFloats = workload.drawData.velFloats;
+-            auto &viewProjIndices = workload.drawData.viewProjIndices;
+-            auto &worldIndices = workload.drawData.worldIndices;
+-            auto &posTransformed = workload.drawData.posTransformed;
+-            const uint32_t newIndex = workload.drawData.vertexCount();
+-            posFloats.emplace_back(posFloats[globalIndex * 3 + 0]);
+-            posFloats.emplace_back(posFloats[globalIndex * 3 + 1]);
+-            posFloats.emplace_back(posFloats[globalIndex * 3 + 2]);
+-            velFloats.emplace_back(velFloats[globalIndex * 3 + 0]);
+-            velFloats.emplace_back(velFloats[globalIndex * 3 + 1]);
+-            velFloats.emplace_back(velFloats[globalIndex * 3 + 2]);
+-            normColBytes.emplace_back(normColBytes[globalIndex * 4 + 0]);
+-            normColBytes.emplace_back(normColBytes[globalIndex * 4 + 1]);
+-            normColBytes.emplace_back(normColBytes[globalIndex * 4 + 2]);
+-            normColBytes.emplace_back(normColBytes[globalIndex * 4 + 3]);
+-            tcFloats.emplace_back(tcFloats[globalIndex * 2 + 0]);
+-            tcFloats.emplace_back(tcFloats[globalIndex * 2 + 1]);
+-            tcVelFloats.emplace_back(tcVelFloats[globalIndex * 2 + 0]);
+-            tcVelFloats.emplace_back(tcVelFloats[globalIndex * 2 + 1]);
+-            viewProjIndices.emplace_back(viewProjIndices[globalIndex]);
+-            worldIndices.emplace_back(worldIndices[globalIndex]);
+-            fogIndices.emplace_back(fogIndices[globalIndex]);
+-            lightIndices.emplace_back(lightIndices[globalIndex]);
+-            lightCounts.emplace_back(lightCounts[globalIndex]);
+-            lookAtIndices.emplace_back(lookAtIndices[globalIndex]);
+-            posTransformed.emplace_back(posTransformed[globalIndex]);
+-            posScreen.emplace_back(posScreen[globalIndex]);
+-            indices[dstIndex] = newIndex;
++            globalIndex = copyVertex(globalIndex);
++            indices[dstIndex] = globalIndex;
+             used[dstIndex] = false;
+-            globalIndex = indices[dstIndex];
+         }
+ 
+         // Modify the attributes.
+@@ -808,8 +822,8 @@ namespace RT64 {
+             break;
+         }
+         case G_MWO_POINT_XYSCREEN: {
+-            // First bit being 0 indicates it should modify only XY.
+-            modifyPosUints.emplace_back(globalIndex << 1);
++            // The two low bits being 0 indicate it should modify only XY.
++            modifyPosUints.emplace_back(globalIndex << 2);
+             modifyPosUints.emplace_back(value);
+ 
+             // We decode on the CPU anyway for draw area tracking and the debugger.
+@@ -820,8 +834,8 @@ namespace RT64 {
+             break;
+         }
+         case G_MWO_POINT_ZSCREEN: {
+-            // First bit being 1 indicates it should modify only Z.
+-            modifyPosUints.emplace_back((globalIndex << 1) | 0x1);
++            // The two low bits being 1 indicate it should modify only Z.
++            modifyPosUints.emplace_back((globalIndex << 2) | 0x1);
+             modifyPosUints.emplace_back(value);
+ 
+             // We decode on the CPU anyway for depth tracking, branchZ and the debugger.
+@@ -1258,6 +1272,66 @@ namespace RT64 {
+         drawIndexedTri(a, b, c, false);
+     }
+ 
++    void RSP::drawIndexedLine(uint32_t a, uint32_t b, uint8_t width) {
++        if ((a >= RSP_MAX_VERTICES) || (b >= RSP_MAX_VERTICES)) {
++            assert(false && "Vertex index is not valid. DL is possibly corrupted.");
++            return;
++        }
++
++        // The line microcodes draw a line as a quad along it on the screen, 1.5 pixels wide and half a pixel wider for
++        // each step of its width. Vertices are transformed on the GPU, so each corner is a copy of one end that
++        // RSPModifyCS moves off the line by half the width after the transform (the two low bits being 2), to the side
++        // that bit 8 of the value says, with the other end's index above it. It's done here too, for draw area
++        // tracking and the debugger. A line is drawn whichever way it faces.
++        const int workloadCursor = state->ext.workloadQueue->writeCursor;
++        Workload &workload = state->ext.workloadQueue->workloads[workloadCursor];
++        const uint32_t ends[2] = { indices[a], indices[b] };
++        used[a] = used[b] = true;
++
++        const float halfWidth = (1.5f + width * 0.5f) / 2.0f;
++        uint32_t corners[4];
++        for (uint32_t i = 0; i < 4; i++) {
++            const uint32_t end = ends[i / 2];
++            const uint32_t other = ends[1 - (i / 2)];
++            const uint32_t side = i & 1;
++            assert((other < (1U << 23)) && "Too many vertices for a line's corner to name the other end.");
++            corners[i] = copyVertex(end);
++            workload.drawData.modifyPosUints.emplace_back((corners[i] << 2) | 0x2);
++            workload.drawData.modifyPosUints.emplace_back((other << 9) | (side << 8) | width);
++
++            auto &posScreen = workload.drawData.posScreen;
++            float dx = posScreen[other][0] - posScreen[end][0];
++            float dy = posScreen[other][1] - posScreen[end][1];
++            const float length = std::sqrt(dx * dx + dy * dy);
++            if (length > 0.0f) {
++                dx /= length;
++                dy /= length;
++            }
++            else {
++                dx = 1.0f;
++                dy = 0.0f;
++            }
++
++            const float offset = side ? -halfWidth : halfWidth;
++            posScreen[corners[i]][0] = posScreen[end][0] - dy * offset;
++            posScreen[corners[i]][1] = posScreen[end][1] + dx * offset;
++        }
++
++        // Each end's corners are on either side of the line, and the other end's are the other way round from it, so
++        // the four go round the quad.
++        const uint32_t cullMode = geometryModeStack[geometryModeStackSize - 1] & cullBothMask;
++        if (cullMode != 0) {
++            clearGeometryMode(cullMode);
++        }
++
++        drawIndexedTri(corners[0], corners[1], corners[2], true);
++        drawIndexedTri(corners[0], corners[2], corners[3], true);
++
++        if (cullMode != 0) {
++            setGeometryMode(cullMode);
++        }
++    }
++
+     void RSP::setViewportAlign(uint16_t ori, int16_t offx, int16_t offy) {
+         extended.global.viewportOrigin = ori;
+         extended.global.viewportOffsetX = offx;
+diff --git a/src/hle/rt64_rsp.h b/src/hle/rt64_rsp.h
+index 61bb3b1..c90d6ed 100644
+--- a/src/hle/rt64_rsp.h
++++ b/src/hle/rt64_rsp.h
+@@ -260,6 +260,7 @@ namespace RT64 {
+         void readExtendedVertexSegment(uint32_t rdramAddress, uint32_t dstIndex, uint32_t dstMax, uint32_t globalIndex, uint32_t vertexElement, std::vector<float> &floatsVector);
+         template<bool addEmptyVelocity, uint32_t vertexSize>
+         void setVertexCommon(uint32_t rdramAddress, uint32_t dstIndex, uint32_t dstMax);
++        uint32_t copyVertex(uint32_t globalIndex);
+         void modifyVertex(uint16_t dstIndex, uint16_t dstAttribute, uint32_t value);
+         void setGeometryMode(uint32_t mask);
+         void pushGeometryMode();
+@@ -293,6 +294,7 @@ namespace RT64 {
+         void setTextureImage(uint8_t fmt, uint8_t siz, uint16_t width, uint32_t segAddress);
+         void drawIndexedTri(uint32_t a, uint32_t b, uint32_t c, bool rawGlobalIndices);
+         void drawIndexedTri(uint32_t a, uint32_t b, uint32_t c);
++        void drawIndexedLine(uint32_t a, uint32_t b, uint8_t width);
+         void setViewportAlign(uint16_t ori, int16_t offx, int16_t offy);
+         void vertexTestZ(uint8_t vtxIndex);
+         void endVertexTestZ();
+diff --git a/src/shaders/RSPModifyCS.hlsl b/src/shaders/RSPModifyCS.hlsl
+index 8bf03a1..c4e5130 100644
+--- a/src/shaders/RSPModifyCS.hlsl
++++ b/src/shaders/RSPModifyCS.hlsl
+@@ -21,12 +21,22 @@ void CSMain(uint modifyIndex : SV_DispatchThreadID) {
+     }
+ 
+     const uint modifyOffset = modifyIndex * 2;
+-    const bool modifyZ = loadUint32(srcModifyPos, modifyOffset) & 0x1;
+-    const uint vertexIndex = loadUint32(srcModifyPos, modifyOffset) >> 1;
++    const uint modifyType = loadUint32(srcModifyPos, modifyOffset) & 0x3;
++    const uint vertexIndex = loadUint32(srcModifyPos, modifyOffset) >> 2;
+     const uint modifyValue = loadUint32(srcModifyPos, modifyOffset + 1);
+-    if (modifyZ) {
++    if (modifyType == 1) {
+         screenPos[vertexIndex].z = modifyValue / 65536.0f;
+     }
++    else if (modifyType == 2) {
++        // A corner of a line's quad (RSP::drawIndexedLine): a copy of one end, moved off the line by half its width.
++        const uint otherIndex = modifyValue >> 9;
++        const float halfWidth = (1.5f + (modifyValue & 0xFF) * 0.5f) / 2.0f;
++        const float offset = (modifyValue & 0x100) ? -halfWidth : halfWidth;
++        float2 direction = screenPos[otherIndex].xy - screenPos[vertexIndex].xy;
++        const float directionLength = length(direction);
++        direction = (directionLength > 0.0f) ? (direction / directionLength) : float2(1.0f, 0.0f);
++        screenPos[vertexIndex].xy += float2(-direction.y, direction.x) * offset;
++    }
+     else {
+         const uint extX = (modifyValue >> 16) & 0xFFFF;
+         const uint extY = modifyValue & 0xFFFF;
