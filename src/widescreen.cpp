@@ -7,8 +7,12 @@
 // GBI into the game's display list there: around the HUD, a scissor as wide as the window and automatic anchoring
 // (runtime-patches/rt64-3-auto-anchor-hud.patch), and at the end of the frame, the border's side rectangles taken out.
 // From its camera, the matrix its culling reads, which the engine widens. All only while the picture is wider than
-// 4:3. After PaxDino's src/game/widescreen.cpp (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the
+// 4:3. And from the same matrix, at any width, a camera cut, whose frame RT64 is told not to interpolate the view into
+// (Frame interpolation in docs/widescreen.md). After PaxDino's src/game/widescreen.cpp (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the
 // frame's own commands instead of Rage Wars' addresses.
+#include <cmath>
+#include <cstdio>  // DEBUG
+#include <cstdlib> // DEBUG
 #include <cstdint>
 #include <cstring>
 
@@ -23,6 +27,7 @@ namespace {
     uint32_t dl_opcode = 0xDE;   // the microcode's G_DL
     uint32_t frame_start = 0;   // the head where this frame's display list starts
     bool hud_open = false;      // hud_begin wrote its commands, so hud_end closes them
+    uint32_t cut_slot = 0;      // where frame_begin left room in this frame's display list for a camera cut's commands
 
     constexpr uint32_t kOriginLeft = 0x0;   // G_EX_ORIGIN_LEFT
     constexpr uint32_t kOriginRight = 0x400; // G_EX_ORIGIN_RIGHT
@@ -53,6 +58,87 @@ namespace {
             MEM_W(0, (gpr)(int32_t)head_var) = (int32_t)head;
         }
     };
+
+    bool interpolating() {
+        return ultramodern::renderer::get_graphics_config().rr_option != ultramodern::renderer::RefreshRate::Original;
+    }
+
+    // Camera cuts. A camera's view is where its eye is and which way it looks, both from its float view-projection
+    // matrix (a row vector times it is the clip position): the eye is the one point whose clip x, y and w are all 0,
+    // and w, the depth along the view, grows along the direction it looks. The games draw a view for each camera
+    // (Turok 2's split screen has up to four), so the n-th camera of a frame is held up to the n-th of the frame before.
+    struct View {
+        float eye[3];
+        float look[3];
+        bool known;
+    };
+    constexpr uint32_t kMaxCameras = 4;
+    View views[kMaxCameras];
+    uint32_t camera_count = 0; // cameras seen since the last frame was sent
+    bool camera_cut = false;   // one of them cut to another shot
+
+    // Further than a camera goes in a frame of the game's own, or turned further: a cut. The player turns at most
+    // about 15 degrees a frame and runs ...; the cutscenes' cuts move it ...
+    constexpr float kCutDistance = 1e30f;
+    constexpr float kCutCosine = -2.0f;
+
+    bool read_view(uint8_t* rdram, uint32_t matrix, View* view) {
+        float m[4][4];
+        for (uint32_t i = 0; i < 16; i++) {
+            uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)(matrix + i * 4));
+            std::memcpy(&m[i / 4][i % 4], &bits, sizeof(float));
+        }
+        // The eye: sum over i of eye[i] * m[i][c] = -m[3][c], for clip x, y and w (Cramer's rule).
+        const uint32_t cols[3] = { 0, 1, 3 };
+        auto det = [&](int replaced) {
+            float a[3][3];
+            for (int r = 0; r < 3; r++) {
+                for (int i = 0; i < 3; i++) {
+                    a[r][i] = i == replaced ? -m[3][cols[r]] : m[i][cols[r]];
+                }
+            }
+            return a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
+                   a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+        };
+        float d = det(-1);
+        float length = std::sqrt(m[0][3] * m[0][3] + m[1][3] * m[1][3] + m[2][3] * m[2][3]);
+        if (d == 0.0f || length == 0.0f) { // not a perspective view: an orthographic one has no eye
+            return false;
+        }
+        for (int i = 0; i < 3; i++) {
+            view->eye[i] = det(i) / d;
+            view->look[i] = m[i][3] / length;
+        }
+        return std::isfinite(view->eye[0]) && std::isfinite(view->eye[1]) && std::isfinite(view->eye[2]);
+    }
+
+    void note_camera(uint8_t* rdram, uint32_t matrix) {
+        uint32_t index = camera_count++;
+        if (index >= kMaxCameras) {
+            return;
+        }
+        View view;
+        View& last = views[index];
+        if (!read_view(rdram, matrix, &view)) {
+            last.known = false;
+            return;
+        }
+        if (last.known) {
+            float dx = view.eye[0] - last.eye[0], dy = view.eye[1] - last.eye[1], dz = view.eye[2] - last.eye[2];
+            float moved = std::sqrt(dx * dx + dy * dy + dz * dz);
+            float turned = view.look[0] * last.look[0] + view.look[1] * last.look[1] + view.look[2] * last.look[2];
+            if (moved > kCutDistance || turned < kCutCosine) {
+                camera_cut = true;
+            }
+            if (std::getenv("TUROK_CUT_LOG")) {
+                fprintf(stderr, "cut-log cam %u moved %.2f turned %.2f deg%s
+", index, moved,
+                        std::acos(std::fmax(-1.0f, std::fmin(1.0f, turned))) * 57.29578f, camera_cut ? " CUT" : "");
+            }
+        }
+        view.known = true;
+        last = view;
+    }
 
     // A frame's display list is no longer than this: a head that moved further, or backwards, isn't this frame's.
     constexpr uint32_t kMaxFrameBytes = 0x40000;
@@ -157,21 +243,35 @@ void turok::set_display_list_head(uint32_t address, Microcode microcode) {
 }
 
 // Where the frame's display list starts, which the border and the HUD look back to. Frame interpolation is RT64's own
-// matching, unchanged: forcing interpolation on with a matrix group at the frame's base tears the level's geometry
-// while the camera turns (docs/widescreen.md).
+// matching: forcing interpolation on with a matrix group at the frame's base tears the level's geometry while the
+// camera turns (docs/widescreen.md). What the engine adds is the camera cut, which RT64 can't tell from a turn: while
+// RT64 interpolates (Framerate above Original), the frame's list starts with room for three commands, no-ops unless
+// turok_frame_end finds that a camera cut.
 extern "C" void turok_frame_begin(uint8_t* rdram) {
-    (void)rdram;
     frame_start = head_var != 0 ? (uint32_t)MEM_W(0, (gpr)(int32_t)head_var) : 0;
     hud_open = false;
+    cut_slot = 0;
+    if (frame_start != 0 && (frame_start & 7) == 0 && interpolating()) {
+        Writer dl{ rdram, frame_start };
+        for (int i = 0; i < 3; i++) {
+            dl.cmd(hook_opcode << 24, 0); // G_SPNOOP
+        }
+        dl.finish();
+        cut_slot = frame_start;
+    }
 }
 
 // The camera's culling. The games test what to draw against their own view-projection matrix (a float one, the
 // camera's, which it also converts for the display list), so whatever is outside the 4:3 view isn't drawn, and the
 // sides of a widened picture are missing it. Once the display list's copy is made, the float matrix's x column is
 // scaled so its view is as wide as 21:9: the picture is unchanged and the culling lets through what a window up to that
-// wide shows.
+// wide shows. First, at any width, the matrix's view is held up to the last frame's for a camera cut (note_camera).
 extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
-    if (!turok::widescreen_active() || matrix == 0) {
+    if (matrix == 0) {
+        return;
+    }
+    note_camera(rdram, matrix);
+    if (!turok::widescreen_active()) {
         return;
     }
     constexpr float kScale = (4.0f / 3.0f) / (21.0f / 9.0f);
@@ -213,7 +313,23 @@ extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t co
 // becomes a no-op, in the frame's own display list. Turok 2's are a pixel each, its rows 0 and 359 drawn after the HUD,
 // and in a widened picture, with no black bars above and below it, they are black strips along the window's top and
 // bottom edges. Then the screen's last column and row, which the games' scissor can leave out: open_scissor_last_pixel.
+//
+// First, the camera cut: if a camera cut since the last frame was sent, the room frame_begin left at the list's start
+// gets RT64's extended GBI and a matrix group for the projections that ignores them (gEXMatrixGroupNoInterpolate,
+// G_MTX_PROJECTION), so RT64 matches this frame's view to none of the last's. Its frames between the two then show the
+// new shot, where they drew the camera partway between the two: Turok 1's Campaigner death scene showed, between a
+// rooftop and a hall, a flat tan field with one pillar.
 extern "C" void turok_frame_end(uint8_t* rdram) {
+    if (camera_cut && cut_slot != 0) {
+        Writer dl{ rdram, cut_slot };
+        dl.enable();
+        dl.cmd(0x6400000C, 0); // gEXMatrixGroupNoInterpolate(G_EX_NOPUSH, G_MTX_PROJECTION, G_EX_EDIT_NONE): the id
+        dl.cmd(1 << 1, 0);     //   G_EX_ID_IGNORE, proj, every component skipped
+    }
+    camera_cut = false;
+    camera_count = 0;
+    cut_slot = 0;
+
     uint32_t end;
     if (!turok::widescreen_active() || !frame_list_end(rdram, &end)) {
         return;
