@@ -22,6 +22,7 @@ says so.
 
 - `docs/rom_layout.md`: where the games' code is in the ROM, where it runs (the TLB mappings), and what that means for
   the symbols, the runtime and the web.
+- `docs/render_to_ram.md`: why the games run without RT64's copy of each frame into RDRAM, and how that was checked.
 - `tools/gen_syms.py`: the function finder. It writes a game's `syms/` (the symbols N64Recomp reads) from the ROM
   and the game's `syms/layout.toml`, with no decompilation: spimdisasm's functions, jal targets, code pointers made
   in code and in data, stack-frame setups, the gaps between, with jump tables' case labels and the data fragments the
@@ -41,6 +42,8 @@ says so.
   thread queues, the pak's raw reads, osUnmapTLB).
 - `src/widescreen.cpp`: what RT64's widescreen (Expand) needs from the game's display list: the HUD anchored to the
   window's sides, the border at the old 4:3 edges taken out and the camera's culling widened (`docs/widescreen.md`).
+- `src/render_to_ram.cpp`: RT64's copy of each frame back into RDRAM turned off, which none of the games needs, and
+  the Graphics tab's Copy Frames to RAM option that turns it back on (`docs/render_to_ram.md`).
 - `src/turok_engine.h`: all of the above, as a game calls it.
 - `tools/submodules.sh`: a game checkout's submodules, filled from a cache of mirrors every checkout on the machine
   shares, in place of `git submodule update --init --recursive`. The first checkout fills the cache; every one after
@@ -71,7 +74,8 @@ Anything else the games share comes here when a change needs it in more than one
   `turok::map_tlb_sections` with N64Recomp's section table and `turok::set_vm_base` with the first address its VM
   server hands out. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. A game with
   another accessory than a Controller Pak in port 1 calls `turok::set_accessories`, and one that supports widescreen
-  calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera (`docs/widescreen.md`).
+  calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera (`docs/widescreen.md`). Its
+  config passes its Graphics tab to `turok::add_copy_frames_option` (`docs/render_to_ram.md`).
 
 ## Changing it
 

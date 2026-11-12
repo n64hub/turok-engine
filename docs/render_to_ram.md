@@ -23,10 +23,11 @@ frame shows up as a recompiled function (`func_<address>`) reading inside a buff
 | Game | Buffers | Played | The game's own accesses |
 |---|---|---|---|
 | Turok: Dinosaur Hunter | three 320x240 at 0x80200000, depth at 0x803DA800 | boot, title, the first level, the pause menu | only past 0x80270800 (the third buffer's end) and before 0x803DA800 |
-| Turok 2 | three 480x360 at 0x80600000, and 0x80700000 | boot, menus, a new game's opening cinematics, the Port of Adia, the pause menu, the map | only the pages the buffers share with the data after them |
-| Turok 3 | TODO | TODO | TODO |
+| Turok 2 | three 480x360 at 0x80600000, depth at 0x80700000 | boot, menus, a new game's opening cinematics, the Port of Adia, the pause menu, the map | only the pages the buffers share with the data after them |
+| Turok 3 | two 284 wide at 0x80500280, depth at 0x80600000, and a 128x128 8-bit image at 0x801FC900 it draws into | boot, menus, the Breach, the pause menu, the objectives | only the pages the buffers share with the data around them |
 | Rage Wars | three 480x360 at 0x80500000, depth at 0x80600000 | boot, menus, a match of 80 s with a death | only the pages the buffers share with the data after them |
 
 Everything inside the buffers was RT64's own thread: its hash of each framebuffer for changes the CPU makes, and on
-Rage Wars' desktop build, which keeps the copy, the copy itself. Each game also plays the same with the copy off: its
-pause menu's background (the level, dimmed, in Turok: Dinosaur Hunter and Turok 2) is drawn again rather than read back.
+Rage Wars' desktop build, which keeps the copy, the copy itself. Turok 3's 128x128 image is drawn by the RDP and
+used by the RDP as a texture, which RT64 keeps on the GPU without the copy. Each game, played with the copy off, draws
+the same as with it on.
