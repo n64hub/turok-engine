@@ -8,12 +8,9 @@ makes it unless told otherwise.
 
 None of the Turok games reads a frame it drew, or writes into one, so `src/render_to_ram.cpp` turns the copy off, on
 the desktop and the page. `turok::add_copy_frames_option` sets it off and puts Copy Frames to RAM on the Graphics tab,
-Off by default, to turn it back on at the next start if something ever looks or behaves wrong without it. Turok 3
-calls it with its Graphics tab. Rage Wars' page (PaxDino-web) turns the copy off in its own `create_render_context`;
-its desktop build's runtime has no switch for it.
-
-Turok: Dinosaur Hunter and Turok 2 keep the copy for now, though they don't need it: on the page, uncapped, RT64
-draws fewer frames between their game frames without it (Measured, below), for a reason not yet known.
+Off by default, to turn it back on at the next start if something ever looks or behaves wrong without it. Turok:
+Dinosaur Hunter, Turok 2 and Turok 3 call it with their Graphics tabs. Rage Wars' page (PaxDino-web) turns the copy
+off in its own `create_render_context`; its desktop build's runtime has no switch for it.
 
 ## How it was checked
 
@@ -37,17 +34,29 @@ the same as with it on.
 
 ## Measured
 
-Each page built with the copy off against the same game's page with it, in Chrome uncapped at 3840x2000 on a desktop
-GPU, played in turn (presents a second, each play's median):
+Each page built with the copy off against the same game's page with it, in Chrome at 3840x2000 on a desktop GPU,
+played in turn (presents a second, each play's median; plays.jsonl in N64Recomp-browser, sets `t1-r2r-limit`,
+`t2-r2r-limit` and `t2-r2r-display`):
 
-| Game | With the copy | Without it |
-|---|---|---|
-| Turok: Dinosaur Hunter | 244, 245 | 225, 225 |
-| Turok 2 | 281, 281 | 226, 226 |
-| Turok 3 | 359 | 359 |
-| Rage Wars | 358 | 355 |
+| Game | Rate | With the copy | Without it |
+|---|---|---|---|
+| Turok: Dinosaur Hunter | uncapped (360) | 244, 245, 269 | 225, 225, 236 |
+| Turok: Dinosaur Hunter | uncapped at 240 | 210.0 | 210.0 |
+| Turok 2 | uncapped (360) | 281, 281, 282 | 226, 226, 255 |
+| Turok 2 | uncapped at 240 | 186.5 | 210.2 |
+| Turok 2 | the display's (headless, ~56) | 50.0 | 55.8 |
+| Turok 3 | uncapped (360) | 359 | 359 |
+| Rage Wars | uncapped (360) | 358 | 355 |
 
-Turok 3 and Rage Wars present near the 360 cap either way. Turok: Dinosaur Hunter and Turok 2 run 30 game frames a
-second both ways, and in Turok: Dinosaur Hunter the GPU's time a present is the same (0.50 ms) with fewer passes
-without the copy, but RT64 draws 7.5 frames for each game frame without it against 8.1 with it. Until that is
-understood, those two keep the copy.
+Turok 2's levels are what the copy costs. The game runs 30 frames a second there either way, but with the copy RT64
+times its frames at 60 (the rate it reads from the VIs between them, which the page's `?present-stats` prints as "the
+game reports"), so it draws too few between them: at the display's rate none, 30.2 frames a second against 55-56
+without the copy, and at 240 about 113 against 211. Without the copy it times them at 30, as it does Turok: Dinosaur
+Hunter's either way.
+
+Uncapped at 360, a game at 30 needs 12 frames drawn for each of its own, and on the page those take turns in RT64's 8
+colour targets, so they are drawn no faster than the ones before them are presented, and those not yet drawn when the
+game's next frame ends are dropped. The copy holds the game 5-6 ms a list, which leaves RT64 more time for them, so
+both games read higher there with it: Turok: Dinosaur Hunter drew 8.9 frames a game frame with the copy and 7.8
+without, each game frame one list of four framebuffer pairs, 33 ms apart, either way (its frame log). At 240, where a
+game frame needs 8, both drew 7 of them (N64Recomp-browser's docs/findings.md, A game at 30, uncapped).
