@@ -102,6 +102,30 @@ namespace {
         }
         return *lrx > 0 && *lry > 0;
     }
+
+    // The screen's last column, which a game's full-screen scissor can stop short of: Turok 2's is (0,0)-(479,359) on a
+    // 480-wide colour image, so it never draws column 479. At 4:3 that column is black beside the window's black
+    // sides; in a widened picture RT64 scales the scissor's right edge with the screen and the column becomes a black
+    // strip down the window's right edge. Each G_SETSCISSOR from the left edge to one pixel short of the colour image
+    // it draws to is opened to the image's edge.
+    void open_scissor_last_column(uint8_t* rdram, uint32_t end) {
+        uint32_t width = 0; // the colour image's, in 10.2
+        for (uint32_t a = frame_start; a < end; a += 8) {
+            Command c = read(rdram, a);
+            uint32_t op = c.w0 >> 24;
+            if (op == 0xFF) { // G_SETCIMG
+                width = ((c.w0 & 0xFFF) + 1) * 4;
+                continue;
+            }
+            if (op != 0xED) {
+                continue;
+            }
+            uint32_t ulx = (c.w0 >> 12) & 0xFFF, lrx = (c.w1 >> 12) & 0xFFF;
+            if (ulx == 0 && width > 4 && lrx == width - 4) {
+                MEM_W(4, (gpr)(int32_t)a) = (int32_t)((c.w1 & ~(0xFFFu << 12)) | (width << 12));
+            }
+        }
+    }
 }
 
 bool turok::widescreen_active() {
@@ -145,7 +169,8 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 }
 
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right
-// edge, becomes a no-op, in the frame's own display list.
+// edge, becomes a no-op, in the frame's own display list. Then the screen's last column, which the games' scissor can
+// leave out: open_scissor_last_column.
 extern "C" void turok_frame_end(uint8_t* rdram) {
     uint32_t end;
     if (!turok::widescreen_active() || !frame_list_end(rdram, &end)) {
@@ -173,11 +198,12 @@ extern "C" void turok_frame_end(uint8_t* rdram) {
             MEM_W(4, (gpr)(int32_t)a) = 0;
         }
     }
+    open_scissor_last_column(rdram, end);
 }
 
-// Before the HUD: the scissor pushed and set to the whole window (to the game's own full-screen scissor's last row,
-// and a pixel short of the right edge as it is: RT64 writes back as many rows as were drawn to), and automatic
-// anchoring on, which puts each HUD rectangle at the side it's nearest by where it sits on the screen.
+// Before the HUD: the scissor pushed and set to the whole window (to the game's own full-screen scissor's last row:
+// RT64 writes back as many rows as were drawn to), and automatic anchoring on, which puts each HUD rectangle at the
+// side it's nearest by where it sits on the screen.
 extern "C" void turok_hud_begin(uint8_t* rdram) {
     hud_open = false;
     uint32_t head;
@@ -188,13 +214,11 @@ extern "C" void turok_hud_begin(uint8_t* rdram) {
     if (!screen_scissor(rdram, head, &lrx, &lry)) {
         return;
     }
-    uint32_t width = (lrx + 4) & ~3u; // the screen's width in 10.2: its last pixel's left edge plus one
-    int32_t right = (int32_t)lrx - (int32_t)width;
     Writer dl{ rdram, head };
     dl.enable();
     dl.cmd(0x64000017, 0); // gEXPushScissor
     dl.cmd(0x64000005, (kOriginLeft << 2) | (kOriginRight << 14)); // gEXSetScissor(G_SC_NON_INTERLACE, LEFT, RIGHT,
-    dl.cmd(0, (((uint32_t)right & 0xFFFF) << 16) | (lry & 0xFFFF)); //   0, 0, right, lry)
+    dl.cmd(0, lry & 0xFFFF);                                         //   0, 0, 0, lry)
     dl.cmd(0x64000034, 1); // gEXSetAutoAnchor(on)
     dl.finish();
     hud_open = true;
