@@ -62,13 +62,14 @@ extern "C" {
     // controller_pak.cpp: osMotorInit, answered as the port's accessory would.
     void turok_motor_init(uint8_t* rdram, recomp_context* ctx);
     // widescreen.cpp, from a game's hooks: once its frame's display list has started (frame_begin) and before it's
-    // sent (frame_end), and before and after its HUD (hud_begin, hud_end). Each does nothing outside Expand.
+    // sent (frame_end), and before and after its HUD (hud_begin, hud_end). Each does nothing outside Expand, but for a
+    // camera cut's frame while RT64 interpolates (frame_begin, frame_end).
     void turok_frame_begin(uint8_t* rdram);
     void turok_frame_end(uint8_t* rdram);
     void turok_hud_begin(uint8_t* rdram);
     void turok_hud_end(uint8_t* rdram);
-    // widescreen.cpp: the camera's float view-projection matrix (at matrix), widened for its culling once the display
-    // list's copy is made.
+    // widescreen.cpp: the camera's float view-projection matrix (at matrix), once the display list's copy is made:
+    // held up to the last frame's for a camera cut, and widened for its culling.
     void turok_widen_culling(uint8_t* rdram, uint32_t matrix);
     // widescreen.cpp: the camera's view pyramid in its own space (count points of three floats, at points), widened as
     // the matrix is before it's moved into the world.

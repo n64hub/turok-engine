@@ -8,12 +8,10 @@
 // (runtime-patches/rt64-3-auto-anchor-hud.patch), and at the end of the frame, the border's side rectangles taken out.
 // From its camera, the matrix its culling reads, which the engine widens. All only while the picture is wider than
 // 4:3. And from the same matrix, at any width, a camera cut, whose frame RT64 is told not to interpolate the view into
-// (Frame interpolation in docs/widescreen.md). After PaxDino's src/game/widescreen.cpp (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the
-// frame's own commands instead of Rage Wars' addresses.
-#include <chrono> // DEBUG
+// (Frame interpolation in docs/widescreen.md). After PaxDino's src/game/widescreen.cpp
+// (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the frame's own commands instead of Rage Wars'
+// addresses.
 #include <cmath>
-#include <cstdio>  // DEBUG
-#include <cstdlib> // DEBUG
 #include <cstdint>
 #include <cstring>
 
@@ -132,10 +130,6 @@ namespace {
             float turned = view.look[0] * last.look[0] + view.look[1] * last.look[1] + view.look[2] * last.look[2];
             if (moved > kCutDistance || turned < kCutCosine) {
                 camera_cut = true;
-            }
-            if (std::getenv("TUROK_CUT_LOG") && (moved > 50.0f || turned < 0.99f)) {
-                fprintf(stderr, "cut-log %lld cam %u moved %.2f turned %.2f deg%s\n", (long long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count(), index, moved,
-                        std::acos(std::fmax(-1.0f, std::fmin(1.0f, turned))) * 57.29578f, camera_cut ? " CUT" : "");
             }
         }
         view.known = true;
@@ -322,7 +316,7 @@ extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t co
 // new shot, where they drew the camera partway between the two: Turok 1's Campaigner death scene showed, between a
 // rooftop and a hall, a flat tan field with one pillar.
 extern "C" void turok_frame_end(uint8_t* rdram) {
-    if (camera_cut && cut_slot != 0 && !std::getenv("TUROK_CUT_OFF")) {
+    if (camera_cut && cut_slot != 0) {
         Writer dl{ rdram, cut_slot };
         dl.enable();
         dl.cmd(0x6400000C, 0); // gEXMatrixGroupNoInterpolate(G_EX_NOPUSH, G_MTX_PROJECTION, G_EX_EDIT_NONE): the id
