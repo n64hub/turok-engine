@@ -25,7 +25,9 @@ times the pixel size) before it calls osViSetMode, which both builds then find.
   stays in the middle.
 - At the end of the frame (`turok_frame_end`): the border the games draw round the screen, whose fill rectangles at the
   old 4:3 edges would be lines down the widened picture. Each vertical G_FILLRECT at most 4 pixels wide and a quarter
-  of the screen high or more, at the left or right edge, becomes a no-op.
+  of the screen high or more, at the left or right edge, becomes a no-op. The frame's display list is read from where
+  `turok_frame_begin` found the head to its G_ENDDL, not to the head: a game may write a second list somewhere else
+  before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines.
 
 The screen's size is the frame's widest G_SETSCISSOR, which the games set before they draw, so the engine needs from
 a game only its display list head (`turok::set_display_list_head`, the address of the pointer its code writes commands
