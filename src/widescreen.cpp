@@ -103,13 +103,15 @@ namespace {
         return *lrx > 0 && *lry > 0;
     }
 
-    // The screen's last column, which a game's full-screen scissor can stop short of: Turok 2's is (0,0)-(479,359) on a
-    // 480-wide colour image, so it never draws column 479. At 4:3 that column is black beside the window's black
-    // sides; in a widened picture RT64 scales the scissor's right edge with the screen and the column becomes a black
-    // strip down the window's right edge. Each G_SETSCISSOR from the left edge to one pixel short of the colour image
-    // it draws to is opened to the image's edge. A scissor set before the frame's first G_SETCIMG (Turok 2 sets it
-    // first) goes with that one.
-    void open_scissor_last_column(uint8_t* rdram, uint32_t end) {
+    // The screen's last column and row, which a game's full-screen scissor can stop short of: Turok 2's is
+    // (0,0)-(479,359) on a 480x360 screen, its last pixel where the RDP wants its size, so it never draws column 479 or
+    // row 359. At 4:3 they are black beside the window's black bars; in a widened picture RT64 scales the scissor with
+    // the screen, and they become black strips along the window's right and bottom edges. Each G_SETSCISSOR from the
+    // top left corner to one pixel short of the colour image's width is opened a column and a row: the colour image
+    // doesn't say its height, and a scissor a column short is a row short too. RT64 then draws, and writes back, the
+    // screen's whole height, which is the framebuffer's. A scissor set before the frame's first G_SETCIMG (Turok 2 sets
+    // it first) goes with that one. Opened once, a scissor no longer matches, so a second pass leaves it alone.
+    void open_scissor_last_pixel(uint8_t* rdram, uint32_t end) {
         uint32_t width = 0; // the colour image's, in 10.2
         for (uint32_t a = frame_start; a < end && width == 0; a += 8) {
             Command c = read(rdram, a);
@@ -127,9 +129,10 @@ namespace {
             if (op != 0xED) {
                 continue;
             }
-            uint32_t ulx = (c.w0 >> 12) & 0xFFF, lrx = (c.w1 >> 12) & 0xFFF;
-            if (ulx == 0 && width > 4 && lrx == width - 4) {
-                MEM_W(4, (gpr)(int32_t)a) = (int32_t)((c.w1 & ~(0xFFFu << 12)) | (width << 12));
+            uint32_t ulx = (c.w0 >> 12) & 0xFFF, uly = c.w0 & 0xFFF;
+            uint32_t lrx = (c.w1 >> 12) & 0xFFF, lry = c.w1 & 0xFFF;
+            if (ulx == 0 && uly == 0 && width > 4 && lrx == width - 4 && lry > 0 && lry + 4 <= 0xFFF) {
+                MEM_W(4, (gpr)(int32_t)a) = (int32_t)((c.w1 & ~0xFFFFFFu) | (width << 12) | (lry + 4));
             }
         }
     }
@@ -176,8 +179,10 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 }
 
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right
-// edge, becomes a no-op, in the frame's own display list. Then the screen's last column, which the games' scissor can
-// leave out: open_scissor_last_column.
+// edge, or a horizontal one at most 4 pixels high, a quarter of the screen wide or more, at its top or bottom edge,
+// becomes a no-op, in the frame's own display list. Turok 2's are a pixel each, its rows 0 and 359 drawn after the HUD,
+// and in a widened picture, with no black bars above and below it, they are black strips along the window's top and
+// bottom edges. Then the screen's last column and row, which the games' scissor can leave out: open_scissor_last_pixel.
 extern "C" void turok_frame_end(uint8_t* rdram) {
     uint32_t end;
     if (!turok::widescreen_active() || !frame_list_end(rdram, &end)) {
@@ -200,23 +205,27 @@ extern "C" void turok_frame_end(uint8_t* rdram) {
         }
         bool vertical = (r_lrx - r_ulx) <= kEdge && (r_lry - r_uly) * 4 >= lry;
         bool at_side = r_ulx <= kEdge || r_lrx + kEdge >= lrx;
-        if (vertical && at_side) {
+        bool horizontal = (r_lry - r_uly) <= kEdge && (r_lrx - r_ulx) * 4 >= lrx;
+        bool at_end = r_uly <= kEdge || r_lry + kEdge >= lry;
+        if ((vertical && at_side) || (horizontal && at_end)) {
             MEM_W(0, (gpr)(int32_t)a) = 0; // G_SPNOOP
             MEM_W(4, (gpr)(int32_t)a) = 0;
         }
     }
-    open_scissor_last_column(rdram, end);
+    open_scissor_last_pixel(rdram, end);
 }
 
-// Before the HUD: the scissor pushed and set to the whole window (to the game's own full-screen scissor's last row:
-// RT64 writes back as many rows as were drawn to), and automatic anchoring on, which puts each HUD rectangle at the
-// side it's nearest by where it sits on the screen.
+// Before the HUD: the frame's scissors so far opened to the screen's last column and row (open_scissor_last_pixel),
+// then the scissor pushed and set to the whole window (down to the game's own full-screen scissor's bottom: RT64
+// writes back as many rows as were drawn to), and automatic anchoring on, which puts each HUD rectangle at the side
+// it's nearest by where it sits on the screen.
 extern "C" void turok_hud_begin(uint8_t* rdram) {
     hud_open = false;
     uint32_t head;
     if (!turok::widescreen_active() || !head_valid(rdram, &head)) {
         return;
     }
+    open_scissor_last_pixel(rdram, head);
     uint32_t lrx, lry;
     if (!screen_scissor(rdram, head, &lrx, &lry)) {
         return;

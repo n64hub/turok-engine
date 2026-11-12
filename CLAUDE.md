@@ -23,6 +23,9 @@ and how a game uses it; docs/rom_layout.md is the games' memory and ROM layout.
   addresses and sizes and its layout file. The engine builds only as part of a game.
 - Something goes here when more than one game needs it, or when it is about the engine family rather than one game
   (the TLB, the FPU mode, the Acclaim microcodes). What one game alone needs stays in that game.
+- What is wrong in RT64, N64ModernRuntime or RecompFrontend for every recomp, and not for something the Turok games do,
+  is N64Recomp-browser's (its patches carry the fixes the recomps share), not this repo's or a game's: work and
+  reports on it go there. `runtime-patches/` is only for what the Turok games need of them.
 - Each game holds this repo as `lib/turok-engine`, pinned at a commit. A change here is a PR to this repo's `main`, and
   each game moves onto it with a PR of its own that moves the pin.
 - A change here that breaks a game's build is fixed in the same work: this repo's CI builds every game that holds it
