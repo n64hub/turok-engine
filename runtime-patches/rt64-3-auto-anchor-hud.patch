@@ -39,7 +39,7 @@ diff --git a/src/hle/rt64_rdp.cpp b/src/hle/rt64_rdp.cpp
 index f6072e1..badaf10 100644
 --- a/src/hle/rt64_rdp.cpp
 +++ b/src/hle/rt64_rdp.cpp
-@@ -1126,6 +1126,64 @@ namespace RT64 {
+@@ -1126,6 +1126,72 @@ namespace RT64 {
          extended.global.rect = extAlignment;
      }
  
@@ -62,9 +62,17 @@ index f6072e1..badaf10 100644
 +        const int32_t width = int32_t(colorImage.width) * 4;
 +        const int32_t height = (width * 3) / 4;
 +        ExtendedAlignment result = extAlignment;
-+        // Half the screen wide or more (a tint over the whole view, a
-+        // cutscene's black bars): stretched across the window instead, its
-+        // sides as far from the window's edges as from the screen's.
++        // As wide as the screen (a tint over the whole view, a menu's
++        // dimming, a cutscene's black bars): left as it is, so RT64
++        // stretches it across the whole window as it does any rectangle
++        // that covers the screen, and not only as far as the HUD may
++        // widen, which stops short of a window wider than that.
++        if ((ulx <= 0) && (lrx + 4 >= width)) {
++            return extAlignment;
++        }
++
++        // Half the screen wide or more: stretched across the HUD instead,
++        // its sides as far from its edges as from the screen's.
 +        if ((lrx - ulx) * 2 >= width) {
 +            result.leftOrigin = G_EX_ORIGIN_LEFT;
 +            result.rightOrigin = G_EX_ORIGIN_RIGHT;
@@ -104,7 +112,7 @@ index f6072e1..badaf10 100644
      void RDP::setScissorAlign(const ExtendedAlignment &extAlignment) {
          extended.global.scissor = extAlignment;
      }
-@@ -1156,6 +1214,7 @@ namespace RT64 {
+@@ -1156,6 +1222,7 @@ namespace RT64 {
          extended.global.rect = ExtendedAlignment();
          extended.global.scissor = ExtendedAlignment();
          extended.global.rectAspect = G_EX_ASPECT_AUTO;
@@ -112,7 +120,7 @@ index f6072e1..badaf10 100644
      }
      
      void RDP::drawTris(uint32_t triCount, const float *pos, const float *tc, const float *col, uint8_t tile, uint8_t levels) {
-@@ -1233,7 +1292,8 @@ namespace RT64 {
+@@ -1233,7 +1300,8 @@ namespace RT64 {
          drawRect(ulx, uly, lrx, lry, uls, ult, dsdx, dtdy, flip, extended.global.rect);
      }
      
