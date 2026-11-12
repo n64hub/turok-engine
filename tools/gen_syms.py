@@ -10,7 +10,7 @@ holding Rage Wars' own. It puts these together into one list of function starts:
 - every jal target, and each code address built with lui and addiu (or ori);
 - each word in a segment's data that points at code, where the code before the target ends a function (a jr $ra, a
   j or a b, and its delay slot), so the case labels of switches stay out, or where the target is hand-written code's
-  entry in the delay slot of a jr $ra;
+  entry in the delay slot of a jr $ra, or where one stale word sits between the target and a jr $ra's delay slot;
 - a stack-frame setup (addiu $sp, $sp, -N) straight after a function's end;
 - the targets of every jump table the code indexes and jr's through are case labels, never starts (jump_table_targets);
 - in the gaps nothing above reaches, code that reads as a whole function (gap search), and each word of data there
@@ -408,9 +408,12 @@ class Finder:
             # delay slot of a jr $ra (Turok 2's 0x0041A4D0, which falls into 0x0041A4D4). A word of data that only
             # happens to equal an address in a delay slot is not one: the slot pops the stack frame (Turok 3's
             # 0x002F0030), or data points at the word after it, which is then the function (Turok 2's 0x00210004).
+            # One stale word can sit between a jr $ra's delay slot and the next function, which nothing reaches but
+            # a pointer in data (Turok 2's 0x00260610, 0x0041A420 and 0x0041D050).
             if not force and src in ("ptr", "data") and not self.ends_function(
                     v, after_data=(src == "ptr" or is_frame_setup(lay.at(v))
-                                   or self.delay_slot_entry(v, data_targets))):
+                                   or self.delay_slot_entry(v, data_targets))) and not (
+                    src == "data" and lay.seg_of(v - 12) is lay.seg_of(v) and lay.at(v - 12) == JR_RA):
                 return
             starts[v] = (name, src)
 
@@ -455,6 +458,15 @@ class Finder:
             nxt = starts.get(v + 4)
             if nxt and not set(nxt[1].split(",")) & {"extra", "jal"}:
                 del starts[v + 4]
+        # And the stale word between a jr $ra's delay slot and a function data points at is no function of its own
+        # (spimdisasm starts one at Turok 2's 0x0041D04C, one word before 0x0041D050), unless it is a jump whose delay
+        # slot the function shares (Turok 2's 0x0041A4CC, a jr $ra, before 0x0041A4D0).
+        for v in [v for v in starts if "data" in starts[v][1].split(",") and lay.seg_of(v - 12) is lay.seg_of(v)
+                  and lay.at(v - 12) == JR_RA]:
+            prev, w = starts.get(v - 4), lay.at(v - 4)
+            if (prev and not set(prev[1].split(",")) & {"extra", "jal", "segstart"}
+                    and not (w == JR_RA or (w >> 26) == 2 or (w >> 16) == 0x1000)):
+                del starts[v - 4]
 
         def resolve():
             out, dropped = [], 0
