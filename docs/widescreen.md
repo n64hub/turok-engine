@@ -71,6 +71,19 @@ the last's by itself. The engine leaves that alone: a matrix group at the base o
 position, rotation and the rest to interpolate tears the level's geometry while the camera turns, where RT64's own
 matching shows none.
 
+What RT64 can't tell from the matrices is a camera cut: it matches the new shot's view to the old one's and draws its
+frames between the two with the camera partway from one to the other. At Turok 1's Campaigner death scene, which cuts
+from a shot across the rooftop to one of the hall, that was a flat tan field with one pillar, for one frame of the
+display's between two of the game's own. The engine sees the cut in the camera's float view-projection matrix, which
+a game hooks for the culling (`turok_widen_culling`, below), at any width: where the eye is (the one point whose clip
+x, y and w are 0) and which way it looks (the w column), held up to the frame before's. An eye that moved further than
+160 units, or a view that turned more than 45 degrees, is a cut. A game draws a view for each camera, so the n-th
+camera of a frame is held up to the n-th of the last. While RT64 interpolates (Framerate above Original),
+`turok_frame_begin` leaves room for three commands at the start of the frame's display list, no-ops, and on a frame
+whose camera cut `turok_frame_end` writes RT64's extended GBI and a matrix group for the projections there that
+ignores them (`gEXMatrixGroupNoInterpolate`, `G_MTX_PROJECTION`): RT64 matches that frame's view to none of the last's,
+and its frames between the two show the new shot.
+
 RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs to find it at the
 VI's origin (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second
 until it did; now its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display (30 at Original),
