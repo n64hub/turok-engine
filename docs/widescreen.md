@@ -7,11 +7,10 @@ projection that covers the whole screen to fit. What it can't know is the game's
 
 RT64 shows its own render only when it finds the framebuffer the VI shows. It takes that from the VI's origin less one
 row, the convention of libultra's own video modes. A game that builds a mode with a field origin of 0 (Turok 2's hi-res
-modes do, and Turok 3's own mode) points the VI at the framebuffer itself. The web build's RT64 on N64Recomp-browser
-v0.184.0 and later takes the framebuffer at the origin then (rt64-web d49a689), but the desktop's doesn't: its present
-still looks a row before the origin, finds nothing there and shows the image read back from RDRAM instead, at 1x, a row
-off, and never wider than 4:3, whatever the settings. So each game sets a field 0 origin of 0 to one row (the width
-times the pixel size) before it calls osViSetMode, which both builds then find.
+modes do, and Turok 3's own mode) points the VI at the framebuffer itself, and RT64 on N64Recomp-browser v0.186.0 and
+later takes the framebuffer at the origin then, on the desktop and the web (rt64-web f5afe59), so a game needs nothing
+for it. On an older pin the desktop's present looks a row before the origin, finds nothing there and shows the image
+read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatever the settings.
 
 ## The HUD and the border
 
@@ -52,10 +51,10 @@ the last's by itself. The engine leaves that alone: a matrix group at the base o
 position, rotation and the rest to interpolate tears the level's geometry while the camera turns, where RT64's own
 matching shows none.
 
-RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs the VI origin a
-row in (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second until
-its origin was moved; with it moved, its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display
-(30 at Original), and its page 315-340 uncapped.
+RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs to find it at the
+VI's origin (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second
+until it did; now its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display (30 at Original),
+and its page 315-340 uncapped.
 
 ## The culling
 
