@@ -74,8 +74,9 @@ Anything else the games share comes here when a change needs it in more than one
   `turok::map_tlb_sections` with N64Recomp's section table and `turok::set_vm_base` with the first address its VM
   server hands out. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. A game with
   another accessory than a Controller Pak in port 1 calls `turok::set_accessories`, and one that supports widescreen
-  calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera (`docs/widescreen.md`). Its
-  config passes its Graphics tab to `turok::add_copy_frames_option` (`docs/render_to_ram.md`).
+  calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera (`docs/widescreen.md`). A game
+  that runs without RT64's copy of each frame into RDRAM passes its Graphics tab to `turok::add_copy_frames_option`
+  (`docs/render_to_ram.md`).
 
 ## Changing it
 
