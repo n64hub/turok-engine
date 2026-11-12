@@ -18,11 +18,15 @@ times the pixel size) before it calls osViSetMode, which both builds then find.
 `src/widescreen.cpp` writes RT64's extended GBI into the game's display list, only while Expand is on:
 
 - Around the HUD (`turok_hud_begin`, `turok_hud_end`): the scissor pushed and opened to the whole window, and automatic
-  anchoring on (`runtime-patches/rt64-3-auto-anchor-hud.patch`). RT64 then stretches each 2D rectangle with no
-  alignment of its own that is half the screen wide or more across the window (a tint over the view, a cutscene's
-  black bars), and places a smaller one at the nearest side by where it sits: the top quarter's to its own side, the
-  bottom quarter's to the left (or the right, past 60% of the width), and what's in between (the crosshair, messages)
-  stays in the middle.
+  anchoring on (`runtime-patches/rt64-3-auto-anchor-hud.patch`). For each 2D rectangle with no alignment of its own:
+  - As wide as the screen (Turok 2's underwater tint, a menu's dimming, a cutscene's black bars): left unanchored.
+    RT64 stretches any rectangle that covers the screen across the whole window, as it does the 3D. Anchoring it to
+    the sides would take it only as far as the HUD may widen, which RT64's extended aspect ratio can hold narrower
+    than the window (16:9, say, in a 1.92:1 window), and the tint would stop short of the picture's sides.
+  - Half the screen wide or more: stretched across the HUD's width.
+  - Smaller ones go to the nearest side by where they sit: the top quarter's to their own side, the bottom quarter's
+    to the left (or to the right, past 60% of the width), and what's in between (the crosshair, messages) stays in the
+    middle.
 - At the end of the frame (`turok_frame_end`): the border the games draw round the screen, whose fill rectangles at the
   old 4:3 edges would be lines down the widened picture. Each vertical G_FILLRECT at most 4 pixels wide and a quarter
   of the screen high or more, at the left or right edge, becomes a no-op. The frame's display list is read from where
