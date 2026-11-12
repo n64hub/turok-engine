@@ -19,6 +19,7 @@
 namespace {
     uint32_t head_var = 0;      // the game's display list head, a pointer in RDRAM
     uint32_t hook_opcode = 0xE0; // the microcode's no-op, which RT64's extended GBI is switched on with
+    uint32_t end_opcode = 0xDF;  // the microcode's G_ENDDL
     uint32_t frame_start = 0;   // the head where this frame's display list starts
     bool hud_open = false;      // hud_begin wrote its commands, so hud_end closes them
 
@@ -63,6 +64,26 @@ namespace {
         return *head >= frame_start && *head - frame_start <= kMaxFrameBytes && (*head & 7) == 0;
     }
 
+    // Where the frame's own display list ends: at its G_ENDDL, before the head if the head is still in it. A game can go
+    // on to write a second list somewhere else before the frame is done, and the head is then in that one: Turok 2's
+    // map, drawn over the frame as lines in a list of its own.
+    bool frame_list_end(uint8_t* rdram, uint32_t* end) {
+        uint32_t head;
+        bool in_frame = head_valid(rdram, &head);
+        if (frame_start == 0) {
+            return false;
+        }
+        uint32_t limit = in_frame ? head : frame_start + kMaxFrameBytes;
+        for (uint32_t a = frame_start; a < limit; a += 8) {
+            if ((read(rdram, a).w0 >> 24) == end_opcode) {
+                *end = a + 8;
+                return true;
+            }
+        }
+        *end = limit;
+        return in_frame;
+    }
+
     // The screen, from the widest G_SETSCISSOR the frame has set so far: the games set a full-screen one before they
     // draw. Its lower right corner, in 10.2 fixed point, is the screen's last pixel.
     bool screen_scissor(uint8_t* rdram, uint32_t end, uint32_t* lrx, uint32_t* lry) {
@@ -90,6 +111,7 @@ bool turok::widescreen_active() {
 void turok::set_display_list_head(uint32_t address, Microcode microcode) {
     head_var = address;
     hook_opcode = microcode == Microcode::F3DEX ? 0x00 : 0xE0; // G_SPNOOP in each
+    end_opcode = microcode == Microcode::F3DEX ? 0xB8 : 0xDF;  // G_ENDDL in each
 }
 
 // Where the frame's display list starts, which the border and the HUD look back to. Frame interpolation is RT64's own
@@ -123,10 +145,10 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 }
 
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right
-// edge, becomes a no-op.
+// edge, becomes a no-op, in the frame's own display list.
 extern "C" void turok_frame_end(uint8_t* rdram) {
     uint32_t end;
-    if (!turok::widescreen_active() || !head_valid(rdram, &end)) {
+    if (!turok::widescreen_active() || !frame_list_end(rdram, &end)) {
         return;
     }
     uint32_t lrx, lry;
