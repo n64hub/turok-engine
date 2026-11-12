@@ -28,7 +28,10 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
     middle.
 - At the end of the frame (`turok_frame_end`): the border the games draw round the screen, whose fill rectangles at the
   old 4:3 edges would be lines down the widened picture. Each vertical G_FILLRECT at most 4 pixels wide and a quarter
-  of the screen high or more, at the left or right edge, becomes a no-op. The frame's display list is read from where
+  of the screen high or more, at the left or right edge, becomes a no-op. So does each horizontal one at most 4 pixels
+  high and a quarter of the screen wide or more, at the top or bottom edge: Turok 2 fills its rows 0 and 359 after the
+  HUD, and with no black bars above and below a widened picture they are black strips along the window's top and
+  bottom edges (2-3 rows each in a 1000-high window). The frame's display list is read from where
   `turok_frame_begin` found the head to its G_ENDDL, not to the head: a game may write a second list somewhere else
   before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines.
 - Also at the end of the frame, and before the HUD: the screen's last column and row. Turok 2's full-screen scissor is

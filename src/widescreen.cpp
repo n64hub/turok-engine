@@ -179,8 +179,10 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 }
 
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right
-// edge, becomes a no-op, in the frame's own display list. Then the screen's last column and row, which the games'
-// scissor can leave out: open_scissor_last_pixel.
+// edge, or a horizontal one at most 4 pixels high, a quarter of the screen wide or more, at its top or bottom edge,
+// becomes a no-op, in the frame's own display list. Turok 2's are a pixel each, its rows 0 and 359 drawn after the HUD,
+// and in a widened picture, with no black bars above and below it, they are black strips along the window's top and
+// bottom edges. Then the screen's last column and row, which the games' scissor can leave out: open_scissor_last_pixel.
 extern "C" void turok_frame_end(uint8_t* rdram) {
     uint32_t end;
     if (!turok::widescreen_active() || !frame_list_end(rdram, &end)) {
@@ -203,7 +205,9 @@ extern "C" void turok_frame_end(uint8_t* rdram) {
         }
         bool vertical = (r_lrx - r_ulx) <= kEdge && (r_lry - r_uly) * 4 >= lry;
         bool at_side = r_ulx <= kEdge || r_lrx + kEdge >= lrx;
-        if (vertical && at_side) {
+        bool horizontal = (r_lry - r_uly) <= kEdge && (r_lrx - r_ulx) * 4 >= lrx;
+        bool at_end = r_uly <= kEdge || r_lry + kEdge >= lry;
+        if ((vertical && at_side) || (horizontal && at_end)) {
             MEM_W(0, (gpr)(int32_t)a) = 0; // G_SPNOOP
             MEM_W(4, (gpr)(int32_t)a) = 0;
         }
