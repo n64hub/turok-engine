@@ -101,6 +101,13 @@ camera is held up to another's view and may read as a cut, which only leaves tha
 picture changes on the display about 160 ms after the frame that drew it, so a captured cut comes that long after the
 frame the engine saw it in.
 
+One cut is black for a frame, and that is the game's: in Turok 2's Port of Adia opening, from the hero in front of the
+portal to the wide shot of him and Adon, the cut's first frame draws the scene and then, after it, a rectangle over the
+whole screen in opaque black (1-cycle, alpha-blended, the primitive colour 0x000000FF), the rectangle its fades are
+drawn with. The frames either side draw none, and neither do the opening's other cuts. The cinematic runs at 15 frames
+a second, so the screen is black for about 67 ms there at any Framerate setting, and back-to-back captures show 2-7
+black ones. The framebuffer it is drawn in is the one the VI shows and the one RT64 presents, as for every other frame.
+
 RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs to find it at the
 VI's origin (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second
 until it did; now its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display (30 at Original),
