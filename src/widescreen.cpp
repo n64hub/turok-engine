@@ -107,9 +107,16 @@ namespace {
     // 480-wide colour image, so it never draws column 479. At 4:3 that column is black beside the window's black
     // sides; in a widened picture RT64 scales the scissor's right edge with the screen and the column becomes a black
     // strip down the window's right edge. Each G_SETSCISSOR from the left edge to one pixel short of the colour image
-    // it draws to is opened to the image's edge.
+    // it draws to is opened to the image's edge. A scissor set before the frame's first G_SETCIMG (Turok 2 sets it
+    // first) goes with that one.
     void open_scissor_last_column(uint8_t* rdram, uint32_t end) {
         uint32_t width = 0; // the colour image's, in 10.2
+        for (uint32_t a = frame_start; a < end && width == 0; a += 8) {
+            Command c = read(rdram, a);
+            if ((c.w0 >> 24) == 0xFF) {
+                width = ((c.w0 & 0xFFF) + 1) * 4;
+            }
+        }
         for (uint32_t a = frame_start; a < end; a += 8) {
             Command c = read(rdram, a);
             uint32_t op = c.w0 >> 24;
