@@ -87,6 +87,16 @@ whose camera cut `turok_frame_end` writes RT64's extended GBI and a matrix group
 ignores them (`gEXMatrixGroupNoInterpolate`, `G_MTX_PROJECTION`): RT64 matches that frame's view to none of the last's,
 and its frames between the two show the new shot.
 
+Turok 2 and 3 cut the same way, and the same thresholds hold for them. At Framerate Manual 60, captured back to
+back: without the fix, 11 of the 16 cuts of Turok 2's Port of Adia opening that change the picture showed
+frames between the two shots, and 24 of the 26 of Turok 3's opening room scene; with it, none did. Their ordinary
+movement stays well under the thresholds: Turok 2's walking, turning and swimming at most 35 units and 7 degrees a
+frame, Turok 3's turning 3 degrees. The number of cameras a frame draws changes with what is on screen: Turok 2 draws
+two in a level, one in its menus and four on some frames at a shot change, Turok 3 one or two and up to ten while a
+scene loads. On a frame whose count differs from the last's, a camera is held up to another's view and may read as
+a cut, which only leaves that frame's movement unsmoothed. A picture changes on the display about
+160 ms after the frame that drew it, so a capture's cut is that far after the frame the engine saw it in.
+
 RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs to find it at the
 VI's origin (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second
 until it did; now its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display (30 at Original),
