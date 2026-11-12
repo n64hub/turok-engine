@@ -153,7 +153,8 @@ namespace {
     // branches past isn't its end: Turok 3 writes its list in pieces, each a G_DL that doesn't push, past the piece and
     // its G_ENDDL, then a G_DL that pushes, back to the piece. Its cutscenes draw their letterbox's border after such
     // pieces, and in the Breach's first in-level cutscene the first piece holds commands of its own, between the branch
-    // and its G_ENDDL. Only a branch forward inside the frame's list is followed.
+    // and its G_ENDDL. Only such a piece's branch is followed: forward inside the frame's list, to a G_DL that pushes,
+    // back to the command after the branch.
     bool frame_list_end(uint8_t* rdram, uint32_t* end) {
         uint32_t head;
         bool in_frame = head_valid(rdram, &head);
@@ -165,8 +166,11 @@ namespace {
             Command c = read(rdram, a);
             uint32_t op = c.w0 >> 24;
             if (op == dl_opcode && ((c.w0 >> 16) & 0xFF) == 1 && c.w1 > a && c.w1 < limit && (c.w1 & 7) == 0) {
-                a = c.w1 - 8; // G_DL that doesn't push: the list goes on there
-                continue;
+                Command back = read(rdram, c.w1);
+                if ((back.w0 >> 24) == dl_opcode && ((back.w0 >> 16) & 0xFF) == 0 && back.w1 == a + 8) {
+                    a = c.w1; // the piece's call, after which the list goes on
+                    continue;
+                }
             }
             if (op == end_opcode) {
                 *end = a + 8;
