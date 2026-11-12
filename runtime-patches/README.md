@@ -19,6 +19,11 @@ the folder under the game's `lib/` it applies in. Applying them again changes no
   RT64 anchor each 2D rectangle with no alignment of its own to the side it's nearest by where it sits, or stretch it
   across the window when it is half the screen wide or more, for the HUD in widescreen (`src/widescreen.cpp`,
   `docs/widescreen.md`). From PaxDino.
+- `rt64-4-load-with-rows-reversed-loads-nothing.patch`: a tile load whose last row is above its first, and a TLUT load
+  whose last entry or row comes before its first, load nothing, as a tile load whose last column is left of its first
+  already did. RT64 counted their rows (or entries) as `1 + last - first`, which wraps to about four billion, and read
+  RDRAM from the image's address until it faulted, when it replayed the frame's loads at a full sync. Turok 1 crashed
+  a few seconds after L in its first level.
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
