@@ -8,6 +8,10 @@
 #include "recomp.h"
 #include "librecomp/sections.h"
 
+namespace recomp::config {
+    class Config;
+}
+
 namespace turok {
     // The GameEntry's entrypoint_address: where the console's boot code loads the first MB, the header's entry point in
     // kseg0. The runtime loads it there before on_init_callback, which is when the TLB views open; the code itself
@@ -47,6 +51,10 @@ namespace turok {
     enum class Microcode { F3DEX, F3DEX2 };
     bool widescreen_active();
     void set_display_list_head(uint32_t address, Microcode microcode = Microcode::F3DEX2);
+
+    // render_to_ram.cpp: RT64's copy of each frame into RDRAM off, and the Graphics tab's Copy Frames to RAM option
+    // (Off by default) that turns it back on at the next start. With the Graphics tab, before the config is finalized.
+    void add_copy_frames_option(recomp::config::Config& graphics);
 }
 
 // The natives a game names in its syms or calls from its N64Recomp hooks.
