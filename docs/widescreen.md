@@ -6,12 +6,12 @@ projection that covers the whole screen to fit. What it can't know is the game's
 ## What a game needs first
 
 RT64 shows its own render only when it finds the framebuffer the VI shows. It takes that from the VI's origin less one
-row, the convention of libultra's own video modes. A game that builds a mode with a field origin of 0 (Turok 2's
-hi-res modes do, and Turok 3's own mode) points the VI at the framebuffer itself. On N64Recomp-browser v0.184.0 and
-later RT64 then takes the framebuffer at the origin (rt64-web d49a689), and the game needs nothing. On an older one RT64
-finds nothing there and shows the image read back from RDRAM instead: at 1x, a row off, and never wider than 4:3,
-whatever the settings, so Turok 2 sets a field 0 origin of 0 to one row (the width times the pixel size) before it
-calls osViSetMode.
+row, the convention of libultra's own video modes. A game that builds a mode with a field origin of 0 (Turok 2's hi-res
+modes do, and Turok 3's own mode) points the VI at the framebuffer itself. The web build's RT64 on N64Recomp-browser
+v0.184.0 and later takes the framebuffer at the origin then (rt64-web d49a689), but the desktop's doesn't: its present
+still looks a row before the origin, finds nothing there and shows the image read back from RDRAM instead, at 1x, a row
+off, and never wider than 4:3, whatever the settings. So each game sets a field 0 origin of 0 to one row (the width
+times the pixel size) before it calls osViSetMode, which both builds then find.
 
 ## The HUD and the border
 
