@@ -16,6 +16,7 @@
 # (a missing mirror, a fetch); nothing else does, so nobody has to refresh it. Runs at once are safe: a mirror is made
 # under another name and renamed into place, and git's own locks cover fetches.
 set -euo pipefail
+shopt -s inherit_errexit   # a failure inside $(mirror ...) stops the run too
 
 cache="${TUROK_GIT_CACHE:-$HOME/.cache/turok-git}"
 g() { git -c core.longpaths=true "$@"; }   # paths past Windows' 260 characters
@@ -36,7 +37,13 @@ mirror() {
 		g -C "$tmp" config remote.origin.fetch '+refs/heads/*:refs/heads/*'
 		g -C "$tmp" config gc.auto 0           # checkouts borrow its objects: none may ever be pruned
 		g -C "$tmp" config maintenance.auto false
-		mv -T "$tmp" "$dir" 2>/dev/null || rm -rf "$tmp"   # another run made it first: keep theirs
+		# Windows refuses to rename a directory while anything (a virus scanner) holds a file in it open: try again.
+		for _ in 1 2 3 4 5 6 7 8 9 10; do
+			mv -T "$tmp" "$dir" 2>/dev/null && break
+			[ -d "$dir" ] && { rm -rf "$tmp"; break; }   # another run made it first: keep theirs
+			sleep 3
+		done
+		[ -d "$dir" ] || { echo "submodules: could not rename $tmp to $dir" >&2; return 1; }
 	fi
 	if ! g -C "$dir" cat-file -e "$sha^{commit}" 2>/dev/null; then
 		echo "submodules: fetching $url" >&2
@@ -59,9 +66,11 @@ fill() {
 		[ "$(g config -f "$repo/.gitmodules" --default checkout "submodule.$name.update")" = none ] && continue
 		sha=$(g -C "$repo" ls-files -s -- "$path" | awk '$1 == "160000" { print $2 }')
 		[ -n "$sha" ] || continue   # named in .gitmodules, absent from the tree
-		url=$(g -C "$repo" config "submodule.$name.url")
+		# .gitmodules' url, as a fresh clone has it: a shared clone's config can name a local path its worktrees lack.
+		url=$(g config -f "$repo/.gitmodules" "submodule.$name.url")
+		case $url in ./* | ../*) url=$(g -C "$repo" config "submodule.$name.url") ;; esac   # resolved by init
 		ref=$(mirror "$url" "$sha")
-		g -C "$repo" submodule update --quiet ${ref:+--reference "$ref"} -- "$path"
+		g -C "$repo" -c "submodule.$name.url=$url" submodule update --quiet ${ref:+--reference "$ref"} -- "$path"
 		fill "$repo/$path"
 	done
 }
