@@ -8,9 +8,12 @@ makes it unless told otherwise.
 
 None of the Turok games reads a frame it drew, or writes into one, so `src/render_to_ram.cpp` turns the copy off, on
 the desktop and the page. `turok::add_copy_frames_option` sets it off and puts Copy Frames to RAM on the Graphics tab,
-Off by default, to turn it back on at the next start if something ever looks or behaves wrong without it. Turok:
-Dinosaur Hunter, Turok 2 and Turok 3 call it with their Graphics tab. Rage Wars' page (PaxDino-web) turns the copy off
-in its own `create_render_context`; its desktop build's runtime has no switch for it.
+Off by default, to turn it back on at the next start if something ever looks or behaves wrong without it. Turok 3
+calls it with its Graphics tab. Rage Wars' page (PaxDino-web) turns the copy off in its own `create_render_context`;
+its desktop build's runtime has no switch for it.
+
+Turok: Dinosaur Hunter and Turok 2 keep the copy for now, though they don't need it: on the page, uncapped, RT64
+draws fewer frames between their game frames without it (Measured, below), for a reason not yet known.
 
 ## How it was checked
 
@@ -31,3 +34,20 @@ Everything inside the buffers was RT64's own thread: its hash of each framebuffe
 Rage Wars' desktop build, which keeps the copy, the copy itself. Turok 3's 128x128 image is drawn by the RDP and
 used by the RDP as a texture, which RT64 keeps on the GPU without the copy. Each game, played with the copy off, draws
 the same as with it on.
+
+## Measured
+
+Each page built with the copy off against the same game's page with it, in Chrome uncapped at 3840x2000 on a desktop
+GPU, played in turn (presents a second, each play's median):
+
+| Game | With the copy | Without it |
+|---|---|---|
+| Turok: Dinosaur Hunter | 244, 245 | 225, 225 |
+| Turok 2 | 281, 281 | 226, 226 |
+| Turok 3 | 359 | 359 |
+| Rage Wars | 358 | 355 |
+
+Turok 3 and Rage Wars present near the 360 cap either way. Turok: Dinosaur Hunter and Turok 2 run 30 game frames a
+second both ways, and in Turok: Dinosaur Hunter the GPU's time a present is the same (0.50 ms) with fewer passes
+without the copy, but RT64 draws 7.5 frames for each game frame without it against 8.1 with it. Until that is
+understood, those two keep the copy.
