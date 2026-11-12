@@ -42,6 +42,9 @@ says so.
 - `src/widescreen.cpp`: what RT64's widescreen (Expand) needs from the game's display list: the HUD anchored to the
   window's sides, the border at the old 4:3 edges taken out and the camera's culling widened (`docs/widescreen.md`).
 - `src/turok_engine.h`: all of the above, as a game calls it.
+- `tools/submodules.sh`: a game checkout's submodules, filled from a cache of mirrors every checkout on the machine
+  shares, in place of `git submodule update --init --recursive`. The first checkout fills the cache; every one after
+  it skips the download (most of it rt64's `contrib/dxc`) and fetches only what the cache lacks. Its header says how.
 - `runtime-patches/`: changes to N64Recomp and RT64 every Turok game needs (`runtime-patches/README.md`).
 
 Anything else the games share comes here when a change needs it in more than one of them.
@@ -78,6 +81,17 @@ A change is a pull request to `main`: the games pin its commits. A change reache
 This repo's CI builds each game with `lib/turok-engine` at the commit under test, by calling the game's own CI on the
 game's `main` (Windows and Linux, everything but the code generated from the ROM, no link). A change that needs a
 game's change too stays red here until the game's change is on its `main`.
+
+To try a change in a game before it lands, build the game with `lib/turok-engine` at the change. From this checkout,
+with the game checked out beside it:
+
+```sh
+bash tools/submodules.sh ../turok-recomp          # the game's submodules, from the cache
+git -C ../turok-recomp/lib/turok-engine fetch "$PWD" HEAD
+git -C ../turok-recomp/lib/turok-engine checkout -q --detach FETCH_HEAD
+```
+
+and build the game as its README says. Filling the submodules again puts `lib/turok-engine` back at the game's pin.
 
 ## License
 

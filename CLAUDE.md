@@ -8,6 +8,10 @@ and how a game uses it; docs/rom_layout.md is the games' memory and ROM layout.
 ## What lives where
 
 - `tools/gen_syms.py`: writes a game's `syms/` from its ROM and its `syms/layout.toml` (the header says both).
+- `tools/submodules.sh`: fills a game checkout's submodules from a cache of mirrors the machine's checkouts share.
+  Building a game to try a change (README.md, "Changing it") starts with it, never with `git submodule update --init
+  --recursive`, which downloads them all again. Never copy another checkout's submodules either: nested ones name
+  their git directories by absolute path, so the copy's git writes into the other checkout.
 - `src/`: C++ a game compiles into its program, declared in `src/turok_engine.h`.
 - `runtime-patches/`: changes to the submodules every Turok game applies, after N64Recomp-browser's patches and before
   the game's own (`runtime-patches/README.md`).
