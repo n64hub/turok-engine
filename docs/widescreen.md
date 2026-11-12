@@ -48,6 +48,11 @@ the last's by itself. The engine leaves that alone: a matrix group at the base o
 position, rotation and the rest to interpolate tears the level's geometry while the camera turns, where RT64's own
 matching shows none.
 
+RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs the VI origin a
+row in (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second until
+its origin was moved; with it moved, its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display
+(30 at Original), and its page 315-340 uncapped.
+
 ## The culling
 
 The games leave out whatever lies outside their own 4:3 view, so a widened picture would be missing it at its sides,
