@@ -39,11 +39,14 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   HUD, and with no black bars above and below a widened picture they are black strips along the window's top and
   bottom edges (2-3 rows each in a 1000-high window). The frame's display list is read from where
   `turok_frame_begin` found the head to its G_ENDDL, not to the head: a game may write a second list somewhere else
-  before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines. A
-  G_ENDDL that the command before it branches past (a G_DL that doesn't push, to the command after it) is never
-  reached, so the list is read on: Turok 3's cutscenes end each piece of their list that way, and draw their
-  letterbox after them, with a 1-2 pixel border down each side of the picture between its bars (x 0-2 and 282-283 of
-  284) that stayed as two black lines inside the widened picture.
+  before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines. The
+  G_ENDDL is the first one the list reaches as the RSP runs it: a G_DL that doesn't push, forward inside the frame's
+  list, is followed, and a G_ENDDL it branches past is never reached. Turok 3 writes its list in pieces, each a branch
+  past the piece and its G_ENDDL, then a G_DL that pushes, back to the piece, and its cutscenes draw their letterbox
+  after them, with a 1-2 pixel border down each side of the picture between its bars (x 0-2 and 282-283 of 284) that
+  stays as two black lines inside the widened picture unless it is taken out. In the opening scene each piece before
+  the letterbox is empty; in the Breach's first in-level cutscene (the tentacles at the window) the first holds
+  commands of its own, so the G_ENDDL ending it doesn't follow its branch, and only following the branch gets past it.
 - Also at the end of the frame, and before the HUD: the screen's last column and row. Turok 2's full-screen scissor is
   (0,0)-(479,359) on a 480x360 screen (its last pixel, where the RDP wants its size), so it never draws column 479 or
   row 359. At 4:3 they are black beside the window's black bars, but RT64 scales the scissor with the widened screen,

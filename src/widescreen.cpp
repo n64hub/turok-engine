@@ -149,9 +149,12 @@ namespace {
 
     // Where the frame's own display list ends: at its G_ENDDL, before the head if the head is still in it. A game can go
     // on to write a second list somewhere else before the frame is done, and the head is then in that one: Turok 2's
-    // map, drawn over the frame as lines in a list of its own. A G_ENDDL the command before it branches past (a
-    // G_DL that doesn't push, to the command after the G_ENDDL) is never reached, and the list goes on after it: Turok
-    // 3's cutscenes end each piece of their list so, and draw their letterbox's border after them.
+    // map, drawn over the frame as lines in a list of its own. The list is read as the RSP runs it, so a G_ENDDL it
+    // branches past isn't its end: Turok 3 writes its list in pieces, each a G_DL that doesn't push, past the piece and
+    // its G_ENDDL, then a G_DL that pushes, back to the piece. Its cutscenes draw their letterbox's border after such
+    // pieces, and in the Breach's first in-level cutscene the first piece holds commands of its own, between the branch
+    // and its G_ENDDL. Only such a piece's branch is followed: forward inside the frame's list, to a G_DL that pushes,
+    // back to the command after the branch.
     bool frame_list_end(uint8_t* rdram, uint32_t* end) {
         uint32_t head;
         bool in_frame = head_valid(rdram, &head);
@@ -160,11 +163,16 @@ namespace {
         }
         uint32_t limit = in_frame ? head : frame_start + kMaxFrameBytes;
         for (uint32_t a = frame_start; a < limit; a += 8) {
-            if ((read(rdram, a).w0 >> 24) == end_opcode) {
-                Command before = a > frame_start ? read(rdram, a - 8) : Command{ 0, 0 };
-                if ((before.w0 >> 24) == dl_opcode && ((before.w0 >> 16) & 0xFF) == 1 && before.w1 == a + 8) {
+            Command c = read(rdram, a);
+            uint32_t op = c.w0 >> 24;
+            if (op == dl_opcode && ((c.w0 >> 16) & 0xFF) == 1 && c.w1 > a && c.w1 < limit && (c.w1 & 7) == 0) {
+                Command back = read(rdram, c.w1);
+                if ((back.w0 >> 24) == dl_opcode && ((back.w0 >> 16) & 0xFF) == 0 && back.w1 == a + 8) {
+                    a = c.w1; // the piece's call, after which the list goes on
                     continue;
                 }
+            }
+            if (op == end_opcode) {
                 *end = a + 8;
                 return true;
             }
