@@ -25,7 +25,10 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   - Half the screen wide or more: stretched across the HUD's width.
   - Smaller ones go to the nearest side by where they sit: the top quarter's to their own side, the bottom quarter's
     to the left (or to the right, past 60% of the width), and what's in between (the crosshair, messages) stays in the
-    middle.
+    middle. A line of text is one rectangle a letter, each anchored by where it sits, so a message line that reaches
+    the bottom quarter comes apart: Turok 1's first-level hint "TO OPEN LEVEL PORTALS", just below three quarters of
+    the screen, had its first words at the window's left edge and "PORTALS" at the right. A game whose messages are
+    drawn apart from its counters draws them after `turok_hud_end` (Turok 1's us.toml), centred as at 4:3.
 - At the end of the frame (`turok_frame_end`): the border the games draw round the screen, whose fill rectangles at the
   old 4:3 edges would be lines down the widened picture. Each vertical G_FILLRECT at most 4 pixels wide and a quarter
   of the screen high or more, at the left or right edge, becomes a no-op. So does each horizontal one at most 4 pixels
