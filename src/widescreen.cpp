@@ -188,8 +188,10 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 
 // The level's own culling. Apart from the matrix, the camera makes a view pyramid in its own space, its apex at the eye
 // and its far corners from the field of view, which it then moves into the world and takes its side planes and bounding
-// box from: the level's rooms are chosen against that. Each point's x (a float, every 12 bytes from points) is scaled
-// as turok_widen_culling scales the matrix, so the pyramid takes in what a window up to 21:9 shows.
+// box from: the level's rooms are chosen against that. Turok 2's is 4:3 and a third wider than its view, so a picture
+// wider than about 16:9 had the level missing at its sides, whatever the matrix let through. Each point's x (a float,
+// every 12 bytes from points) is scaled as turok_widen_culling scales the matrix, so the pyramid takes in what a window
+// up to 21:9 shows.
 extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t count) {
     if (!turok::widescreen_active() || points == 0) {
         return;
@@ -200,12 +202,6 @@ extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t co
         float f;
         uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)a);
         std::memcpy(&f, &bits, sizeof(f));
-        if (getenv("TUROK_FRUSTUM_LOG")) { // TEMP
-            float y, z; uint32_t yb = (uint32_t)MEM_W(4, (gpr)(int32_t)a), zb = (uint32_t)MEM_W(8, (gpr)(int32_t)a);
-            std::memcpy(&y, &yb, 4); std::memcpy(&z, &zb, 4);
-            static int n = 0; if (n++ < 40) fprintf(stderr, "frustum %u: %f %f %f\n", i, f, y, z);
-        }
-        if (getenv("TUROK_FRUSTUM_OFF")) continue; // TEMP
         f *= kScale;
         std::memcpy(&bits, &f, sizeof(f));
         MEM_W(0, (gpr)(int32_t)a) = (int32_t)bits;
