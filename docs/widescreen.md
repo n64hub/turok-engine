@@ -90,4 +90,6 @@ planes and bounding box the level's rooms are chosen against. Turok 2's is a thi
 alone left a 21:9 picture missing the level past about 16:9: walls and water stopping on one vertical line, the room
 past a corner not drawn at all, the fog colour showing instead. A game hooks its camera once the points are made and
 before they are moved, and calls `turok_widen_frustum` with their address and count: each point's x is scaled as the
-matrix's x column is. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`.
+matrix's x column is. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`;
+Turok 3's makes them in `func_0028E8B8`, at its stack's 0x18, and moves them with `func_002628E8`. The same code,
+at its stack's 0x18, is in Rage Wars' `func_00234DC0`.
