@@ -83,3 +83,11 @@ walls stopping short of the window's edge while the camera turns. They test it a
 view-projection matrix, from which they also make the display list's. A game hooks its camera after that copy is made
 and calls `turok_widen_culling` with the float matrix's address: its x column is scaled to a view as wide as 21:9, so
 the picture is as before and the culling lets through what a window up to that wide shows. Only while Expand is on.
+
+The level is culled a second way, apart from that matrix. The camera makes a view pyramid in its own space, five points
+(the eye, then four far corners from the field of view, 4:3), moves it into the world and takes from it the side
+planes and bounding box the level's rooms are chosen against. Turok 2's is a third wider than its view, so the matrix
+alone left a 21:9 picture missing the level past about 16:9: walls and water stopping on one vertical line, the room
+past a corner not drawn at all, the fog colour showing instead. A game hooks its camera once the points are made and
+before they are moved, and calls `turok_widen_frustum` with their address and count: each point's x is scaled as the
+matrix's x column is. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`.

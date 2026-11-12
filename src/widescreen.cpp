@@ -186,6 +186,28 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
     }
 }
 
+// The level's own culling. Apart from the matrix, the camera makes a view pyramid in its own space, its apex at the eye
+// and its far corners from the field of view, which it then moves into the world and takes its side planes and bounding
+// box from: the level's rooms are chosen against that. Turok 2's is 4:3 and a third wider than its view, so a picture
+// wider than about 16:9 had the level missing at its sides, whatever the matrix let through. Each point's x (a float,
+// every 12 bytes from points) is scaled as turok_widen_culling scales the matrix, so the pyramid takes in what a window
+// up to 21:9 shows.
+extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t count) {
+    if (!turok::widescreen_active() || points == 0) {
+        return;
+    }
+    constexpr float kScale = (21.0f / 9.0f) / (4.0f / 3.0f);
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t a = points + i * 12;
+        float f;
+        uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)a);
+        std::memcpy(&f, &bits, sizeof(f));
+        f *= kScale;
+        std::memcpy(&bits, &f, sizeof(f));
+        MEM_W(0, (gpr)(int32_t)a) = (int32_t)bits;
+    }
+}
+
 // The border: a vertical G_FILLRECT at most 4 pixels wide, a quarter of the screen high or more, at its left or right
 // edge, or a horizontal one at most 4 pixels high, a quarter of the screen wide or more, at its top or bottom edge,
 // becomes a no-op, in the frame's own display list. Turok 2's are a pixel each, its rows 0 and 359 drawn after the HUD,
