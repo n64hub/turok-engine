@@ -105,4 +105,7 @@ past a corner not drawn at all, the fog colour showing instead. A game hooks its
 before they are moved, and calls `turok_widen_frustum` with their address and count: each point's x is scaled as the
 matrix's x column is. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`;
 Turok 3's makes them in `func_0028E8B8`, at its stack's 0x18, and moves them with `func_002628E8`. The same code,
-at its stack's 0x18, is in Rage Wars' `func_00234DC0`.
+at its stack's 0x18, is in Rage Wars' `func_00234DC0`, which needs no hook: its far corners' angle is the
+vertical one times the aspect, in degrees, so at the game's field of view they reach about 67 degrees to each side,
+wider than a 21:9 picture, and with them narrowed to a quarter of that its arenas were drawn the same out to a 21:9
+window's sides while turning.
