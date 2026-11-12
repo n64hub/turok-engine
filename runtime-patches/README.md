@@ -3,7 +3,9 @@
 Changes to the submodules a Turok game builds with, which every game of the family needs. A game's patch step applies
 N64Recomp-browser's own patches first, then these, then the game's own `runtime-patches/`, each
 `<project>-<n>-*.patch` in order of name. `<project>` is a name in N64Recomp-browser's `patches/patches.txt`, which says
-the folder under the game's `lib/` it applies in. Applying them again changes nothing.
+the folder under the game's `lib/` it applies in. Applying them again changes nothing. The step keeps a copy of each
+patch as it applied it, in the git dir of the checkout it patched, and takes that copy out first, so a checkout that
+applied a patch since edited, renamed or removed takes the new one without being cleaned.
 
 - `N64Recomp-1-jump-table-index-from-register.patch`: N64Recomp's C output indexes a jump table by the register the
   code jumps through, less the table's address, as its live generator does, rather than by the offset it saved at the
