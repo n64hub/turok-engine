@@ -25,3 +25,19 @@ jobs:
     uses: n64hub/turok-recomp/.github/workflows/ci.yml@main
     with:
       engine-ref: ${{ github.sha }}
+  # tools/submodules.sh on Linux: a game's submodules from an empty cache, then a second checkout from the full one,
+  # which must download nothing.
+  submodules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fill two checkouts
+        env:
+          TUROK_GIT_CACHE: ${{ runner.temp }}/cache
+        run: |
+          for c in a b; do
+            git clone -q https://github.com/n64hub/turok-recomp "$RUNNER_TEMP/$c"
+            bash tools/submodules.sh "$RUNNER_TEMP/$c" 2>&1 | tee "$RUNNER_TEMP/$c.log"
+            if git -C "$RUNNER_TEMP/$c" submodule status --recursive | grep -v "^ "; then exit 1; fi   # each checked out
+          done
+          if grep -E "caching|fetching" "$RUNNER_TEMP/b.log"; then exit 1; fi   # the second downloads nothing
