@@ -55,6 +55,11 @@ namespace turok {
     // render_to_ram.cpp: RT64's copy of each frame into RDRAM off, and the Graphics tab's Copy Frames to RAM option
     // (Off by default) that turns it back on at the next start. With the Graphics tab, before the config is finalized.
     void add_copy_frames_option(recomp::config::Config& graphics);
+
+    // mouse_look.cpp: the mouse's movement since the last poll, in counts scaled by the Mouse Sensitivity setting (the
+    // frontend's get_mouse_deltas), from the game's get_input for player 1 while mouse look is on, in place of adding it
+    // to the stick. turok_mouse_look turns the view by it.
+    void add_mouse_motion(float dx, float dy);
 }
 
 // The natives a game names in its syms or calls from its N64Recomp hooks.
@@ -82,6 +87,13 @@ extern "C" {
     // widescreen.cpp: the camera's view pyramid in its own space (count points of three floats, at points), widened as
     // the matrix is before it's moved into the world.
     void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t count);
+    // mouse_look.cpp, from a game's hook in its look code, which runs once a frame while the player has control: the
+    // mouse's movement since then added to the player's yaw (a float at yaw, in radians times yaw_scale, growing to
+    // the right) and pitch (at pitch, radians times pitch_scale, growing upwards), the pitch kept within [pitch_min,
+    // pitch_max]. For a look that springs back, pitch_target is the register holding the float target the game is
+    // about to move the pitch towards, which the mouse holds further; nullptr for a pitch that stays where it's put.
+    void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
+        gpr* pitch_target, float pitch_min, float pitch_max);
 }
 
 #endif
