@@ -207,18 +207,21 @@ class Finder:
             return True
         return sum(0x20 <= b < 0x7F for b in self.rom[off - 8:off]) >= 5  # string fragments
 
-    def stale_words(self, vram):
-        """How many stale words sit between a jr $ra's delay slot and vram: one, or up to three when vram opens with a
-        stack-frame setup (Turok 2's menu items' 0x00417490 and 0x0041C960 sit behind three words of code nothing
-        reaches, which spimdisasm takes for the function's start); 0 when no jr $ra is that close. The nearest jr $ra
-        counts: one in between ends a function of its own (Turok 2's 0x00289108, a jr $ra and its nop)."""
+    def stale_words(self, vram, src):
+        """How many stale words sit between a jr $ra's delay slot and vram, which src ("data" or "ptr") points at, or 0.
+
+        One, when data points at vram; up to three when vram opens with a stack-frame setup, as a pointer made in code
+        needs for one too (Turok 3's 0x00420010 is a constant, one word into 0x0042000C). Turok 2's menu items'
+        0x00417490 and 0x0041C960 sit behind three words nothing reaches, and the callback 0x00409000 its code stores
+        behind two: spimdisasm takes the first of them for the function's start. The nearest jr $ra counts: one in
+        between ends a function of its own (Turok 2's 0x00289108, a jr $ra and its nop)."""
         lay = self.lay
         for k in (0, 1, 2, 3):
             jr = vram - 8 - 4 * k
             if lay.seg_of(jr) is not lay.seg_of(vram):
                 return 0
             if lay.at(jr) == JR_RA:
-                return k if k <= 1 or is_frame_setup(lay.at(vram)) else 0
+                return k if k == 0 or (k == 1 and src == "data") or is_frame_setup(lay.at(vram)) else 0
         return 0
 
     def delay_slot_entry(self, vram, data_targets):
@@ -424,12 +427,12 @@ class Finder:
             # happens to equal an address in a delay slot is not one: the slot pops the stack frame (Turok 3's
             # 0x002F0030), or data points at the word after it, which is then the function (Turok 2's 0x00210004).
             # Stale words can sit between a jr $ra's delay slot and the next function, which nothing reaches but a
-            # pointer in data (stale_words: Turok 2's 0x00260610, 0x0041A420 and 0x0041D050 behind one, its
-            # 0x00417490 and 0x0041C960, two menus' items, behind three).
+            # pointer (stale_words: Turok 2's 0x00260610, 0x0041A420 and 0x0041D050 behind one, its 0x00417490 and
+            # 0x0041C960, two menus' items, behind three, and 0x00409000, a callback its code stores, behind two).
             if not force and src in ("ptr", "data") and not self.ends_function(
                     v, after_data=(src == "ptr" or is_frame_setup(lay.at(v))
                                    or self.delay_slot_entry(v, data_targets))) and not (
-                    src == "data" and self.stale_words(v)):
+                    self.stale_words(v, src)):
                 return
             starts[v] = (name, src)
 
@@ -478,8 +481,12 @@ class Finder:
         # (spimdisasm starts one at Turok 2's 0x0041D04C, one word before 0x0041D050, and at 0x0041C954, three before
         # 0x0041C960), unless the last is a jump whose delay slot the function shares (Turok 2's 0x0041A4CC, a jr $ra,
         # before 0x0041A4D0).
-        for v in [v for v in starts if "data" in starts[v][1].split(",") and self.stale_words(v)]:
-            for u in range(v - 4 * self.stale_words(v), v, 4):
+        def stale_before(v):
+            srcs = starts[v][1].split(",")
+            return max([self.stale_words(v, src) for src in ("data", "ptr") if src in srcs] or [0])
+
+        for v in [v for v in starts if stale_before(v)]:
+            for u in range(v - 4 * stale_before(v), v, 4):
                 prev, w = starts.get(u), lay.at(u)
                 if (prev and not set(prev[1].split(",")) & {"extra", "jal", "segstart"}
                         and not (u == v - 4 and (w == JR_RA or (w >> 26) == 2 or (w >> 16) == 0x1000))):
