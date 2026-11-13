@@ -128,7 +128,10 @@ alone left a 21:9 picture missing the level past about 16:9: walls and water sto
 past a corner not drawn at all, the fog colour showing instead. A game hooks its camera once the points are made and
 before they are moved, and calls `turok_widen_frustum` with their address and count: each point's x is scaled as the
 matrix's x column is. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`;
-Turok 3's makes them in `func_0028E8B8`, at its stack's 0x18, and moves them with `func_002628E8`. The same code,
+Turok 3's makes them in `func_0028E8B8`, at its stack's 0x18, and moves them with `func_002628E8`. Turok 1's camera
+(`func_80037E3C`) makes them at its stack's 0xC0 and moves them a point a turn of a loop (`func_800156A4`), whose head
+is the first place after they are made, so its hook widens them on the loop's first turn only. Without it Turok 1's
+first level at 21:9 had its cliff walls stop on a vertical line a little past the 4:3 picture's sides. The same code,
 at its stack's 0x18, is in Rage Wars' `func_00234DC0`, which needs no hook: its far corners' angle is the
 vertical one times the aspect, in degrees, so at the game's field of view they reach about 67 degrees to each side,
 wider than a 21:9 picture, and with them narrowed to a quarter of that its arenas were drawn the same out to a 21:9

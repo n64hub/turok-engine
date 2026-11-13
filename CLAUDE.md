@@ -41,3 +41,8 @@ This repo's work is all of the Turok recompilations' shared work, so a change it
 it (`turok-2-recomp`, `turok-3-recomp`, `turok-recomp`) is made in the same work, not handed on as work of its own: a PR
 there, from a checkout of its `main`, landed by whoever does the work like one here. The game's PR lands first when
 this repo's CI builds that game's `main`; a game's PR that moves the pin lands after this repo's.
+
+A change here reaches players only in a game's release, so it isn't done when it merges: the game's PR that moves the
+pin onto it adds its line to that game's `releases/next.md`, and the work that lands it releases the game, unasked, or
+waits for a release already in flight, which carries it (N64Recomp-browser's CLAUDE.md, Releasing). A fix in a game's
+own repo is released the same way.
