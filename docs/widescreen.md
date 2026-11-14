@@ -41,7 +41,9 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   `turok_frame_begin` found the head to its G_ENDDL, not to the head: a game may write a second list somewhere else
   before the frame is done, and the head is then in that one. Turok 2's map does, drawn over the frame as lines. The
   G_ENDDL is the first one the list reaches as the RSP runs it: a G_DL that doesn't push, forward inside the frame's
-  list, is followed, and a G_ENDDL it branches past is never reached. Turok 3 writes its list in pieces, each a branch
+  list, is followed, and a G_ENDDL it branches past is never reached. Turok 3's split screen ends each view but the
+  last with such a branch, to the command right after a G_ENDDL, so a list read to that G_ENDDL held only the first
+  view, and the others kept their border. Turok 3 also writes its list in pieces, each a branch
   past the piece and its G_ENDDL, then a G_DL that pushes, back to the piece, and its cutscenes draw their letterbox
   after them, with a 1-2 pixel border down each side of the picture between its bars (x 0-2 and 282-283 of 284) that
   stays as two black lines inside the widened picture unless it is taken out. In the opening scene each piece before
@@ -51,15 +53,17 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   (0,0)-(479,359) on a 480x360 screen (its last pixel, where the RDP wants its size), so it never draws column 479 or
   row 359. At 4:3 they are black beside the window's black bars, but RT64 scales the scissor with the widened screen,
   and they become black strips along the window's right edge (8 pixels wide in a 3840-wide window) and bottom edge
-  (3 rows in a 1000-high one). Each G_SETSCISSOR from the screen's top left corner to one pixel short of the colour
-  image's width is opened to the image's edge and a row lower: the colour image doesn't say its height, and a scissor
-  a column short is a row short too. The HUD's scissor reaches the window's right edge and the screen's bottom.
+  (3 rows in a 1000-high one). Each G_SETSCISSOR to one pixel short of the colour image's width is opened to the
+  image's edge, and one from the screen's top left corner a row lower too: the colour image doesn't say its height,
+  and a full-screen scissor a column short is a row short too. A split screen's views at the right edge stop a column
+  short as well (Split screen, below), and only their column is opened. The HUD's scissor reaches the window's right edge and the screen's bottom.
   RT64 then widens a rectangle that ends a pixel short of the scissor to it, as it does with "Fix LR with Scissor".
   It sizes a framebuffer by the rows drawn to it and writes back that many, so it now reads and writes all 360 rows
   of Turok 2's 480x360 framebuffers, which is their size: nothing past them is touched.
 
-The screen's size is the frame's widest G_SETSCISSOR, which the games set before they draw, so the engine needs from
-a game only its display list head (`turok::set_display_list_head`, the address of the pointer its code writes commands
+The screen's size is as far right and as far down as the frame's G_SETSCISSORs reach, which the games set before they
+draw: one full-screen scissor in a frame of one view, one for each view in a split screen (Split screen, below). So the
+engine needs from a game only its display list head (`turok::set_display_list_head`, the address of the pointer its code writes commands
 through) and hooks at four places: after it starts the frame's display list (`turok_frame_begin`), before it's done
 with it (`turok_frame_end`), and before and after the HUD.
 
@@ -69,6 +73,30 @@ game whose head isn't at one address (Turok 1's is in the graphics struct its co
 hook, before `turok_frame_begin`, once the frame's display list buffer is the one it writes.
 
 Where those are in each game is the game's own: its N64Recomp configuration's hooks say.
+
+## Split screen
+
+Turok 2's and Turok 3's multiplayer draw each view in turn, each under its own G_SETSCISSOR, with its own Z clear (a
+G_SETCIMG to the Z buffer and a fill), its own HUD between the HUD hooks, and its own border. Turok 2's two players are
+halves one above the other, (0,0)-(480,179) and (0,178)-(480,357); three and four players are quarters, as are Turok
+3's views, which end at row 219 of its 284x222 screen. The rows below the views stay black at 4:3 too.
+
+Each view's G_SETCIMG makes it a framebuffer pair of its own, and RT64 narrows a pair to 4:3 for a wide window, which
+is what lets it widen the pair's view and place its HUD, only if the scissors the pair drew under are 4:3-shaped. A
+view's own are not, so what makes them so is the HUD's: `turok_hud_begin` opens the scissor to the whole window from
+the screen's top down to at least a 4:3 screen's bottom (so a top view's pair is judged by the screen too, before the
+frame has set any scissor below it), and the view's pair draws its HUD under it. Each view is then widened to the
+window's edges, and the window beside the narrower ones holds the view, not an old frame.
+
+In a view the HUD's rectangles are anchored by where they sit in the view, not on the screen: `turok_hud_begin` gives
+RT64 the view's scissor (gEXSetAutoAnchor's mode 2), and the view's counters go to its edges and its crosshair stays at
+its centre. A view's edges follow HUD Placement, as one view's HUD does, so at 21:9 the outer counters stop at 16:9's
+edges by default; a view's centre is the same fraction of the window as of the N64's screen, whatever HUD Placement is,
+since the views are widened to the window's edges.
+
+A view's border is fills along its edges: those at the screen's edges are taken out with the screen's
+(`turok_frame_end`), and those where views meet stay, the line between them that the game draws at 4:3 too. A view at
+the screen's right edge stops a column short of it, as the full-screen scissor does, and is opened the same way.
 
 ## Frame interpolation
 
