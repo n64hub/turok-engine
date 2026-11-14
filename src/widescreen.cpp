@@ -153,8 +153,9 @@ namespace {
     // branches past isn't its end: Turok 3 writes its list in pieces, each a G_DL that doesn't push, past the piece and
     // its G_ENDDL, then a G_DL that pushes, back to the piece. Its cutscenes draw their letterbox's border after such
     // pieces, and in the Breach's first in-level cutscene the first piece holds commands of its own, between the branch
-    // and its G_ENDDL. Only such a piece's branch is followed: forward inside the frame's list, to a G_DL that pushes,
-    // back to the command after the branch.
+    // and its G_ENDDL. Its split screen ends each view but the last with a G_DL that doesn't push, straight to the
+    // command after the G_ENDDL that follows it, and the rest of the frame's views are past it. So a G_DL that doesn't
+    // push, forward inside the frame's list, is followed: the list goes on at its target.
     bool frame_list_end(uint8_t* rdram, uint32_t* end) {
         uint32_t head;
         bool in_frame = head_valid(rdram, &head);
@@ -166,11 +167,8 @@ namespace {
             Command c = read(rdram, a);
             uint32_t op = c.w0 >> 24;
             if (op == dl_opcode && ((c.w0 >> 16) & 0xFF) == 1 && c.w1 > a && c.w1 < limit && (c.w1 & 7) == 0) {
-                Command back = read(rdram, c.w1);
-                if ((back.w0 >> 24) == dl_opcode && ((back.w0 >> 16) & 0xFF) == 0 && back.w1 == a + 8) {
-                    a = c.w1; // the piece's call, after which the list goes on
-                    continue;
-                }
+                a = c.w1 - 8; // the list goes on at the target
+                continue;
             }
             if (op == end_opcode) {
                 *end = a + 8;
@@ -181,8 +179,11 @@ namespace {
         return in_frame;
     }
 
-    // The screen, from the widest G_SETSCISSOR the frame has set so far: the games set a full-screen one before they
-    // draw. Its lower right corner, in 10.2 fixed point, is the screen's last pixel.
+    // The screen, from the G_SETSCISSORs the frame has set so far: the furthest right and the furthest down any of them
+    // reaches, in 10.2 fixed point, are the screen's last column and row. A frame of one view sets a full-screen
+    // scissor; a split screen sets one for each view, none of them the whole screen. Turok 2's two players are the top
+    // and bottom halves, and the widest scissor alone, the top half's, put the screen's bottom at the middle: the HUD's
+    // scissor stopped there, and player 2 had none.
     bool screen_scissor(uint8_t* rdram, uint32_t end, uint32_t* lrx, uint32_t* lry) {
         *lrx = 0;
         *lry = 0;
@@ -192,10 +193,8 @@ namespace {
                 continue;
             }
             uint32_t x = (c.w1 >> 12) & 0xFFF, y = c.w1 & 0xFFF;
-            if (x > *lrx) {
-                *lrx = x;
-                *lry = y;
-            }
+            *lrx = x > *lrx ? x : *lrx;
+            *lry = y > *lry ? y : *lry;
         }
         return *lrx > 0 && *lry > 0;
     }
@@ -203,10 +202,10 @@ namespace {
     // The screen's last column and row, which a game's full-screen scissor can stop short of: Turok 2's is
     // (0,0)-(479,359) on a 480x360 screen, its last pixel where the RDP wants its size, so it never draws column 479 or
     // row 359. At 4:3 they are black beside the window's black bars; in a widened picture RT64 scales the scissor with
-    // the screen, and they become black strips along the window's right and bottom edges. Each G_SETSCISSOR from the
-    // top left corner to one pixel short of the colour image's width is opened a column and a row: the colour image
-    // doesn't say its height, and a scissor a column short is a row short too. RT64 then draws, and writes back, the
-    // screen's whole height, which is the framebuffer's. A scissor set before the frame's first G_SETCIMG (Turok 2 sets
+    // the screen, and they become black strips along the window's right and bottom edges. Each G_SETSCISSOR to one
+    // pixel short of the colour image's width is opened a column, and one from the top left corner a row too: the
+    // colour image doesn't say its height, and a full-screen scissor a column short is a row short too. RT64 then
+    // draws, and writes back, the screen's whole height, which is the framebuffer's. A scissor set before the frame's first G_SETCIMG (Turok 2 sets
     // it first) goes with that one. Opened once, a scissor no longer matches, so a second pass leaves it alone.
     void open_scissor_last_pixel(uint8_t* rdram, uint32_t end) {
         uint32_t width = 0; // the colour image's, in 10.2
@@ -228,9 +227,14 @@ namespace {
             }
             uint32_t ulx = (c.w0 >> 12) & 0xFFF, uly = c.w0 & 0xFFF;
             uint32_t lrx = (c.w1 >> 12) & 0xFFF, lry = c.w1 & 0xFFF;
-            if (ulx == 0 && uly == 0 && width > 4 && lrx == width - 4 && lry > 0 && lry + 4 <= 0xFFF) {
-                MEM_W(4, (gpr)(int32_t)a) = (int32_t)((c.w1 & ~0xFFFFFFu) | (width << 12) | (lry + 4));
+            if (width <= 4 || lrx != width - 4 || lry == 0 || lry + 4 > 0xFFF) {
+                continue;
             }
+            // A split screen's views at the screen's right edge stop a column short too, and only the column is
+            // opened: their bottom is the view's, or where the game's split screen ends, a few rows above the screen's
+            // (Turok 2's at row 357 of 360, Turok 3's at 219 of 222), as on the console.
+            bool corner = ulx == 0 && uly == 0;
+            MEM_W(4, (gpr)(int32_t)a) = (int32_t)((c.w1 & ~0xFFFFFFu) | (width << 12) | (corner ? lry + 4 : lry));
         }
     }
 }
@@ -366,9 +370,10 @@ extern "C" void turok_frame_end(uint8_t* rdram) {
 }
 
 // Before the HUD: the frame's scissors so far opened to the screen's last column and row (open_scissor_last_pixel),
-// then the scissor pushed and set to the whole window (down to the game's own full-screen scissor's bottom: RT64
-// writes back as many rows as were drawn to), and automatic anchoring on, which puts each HUD rectangle at the side
-// it's nearest by where it sits on the screen.
+// then the scissor pushed and set to the whole window (down to the screen's bottom: RT64 writes back as many rows as
+// were drawn to), and automatic anchoring on, which puts each HUD rectangle at the side it's nearest by where it sits
+// on the screen. In a split screen each view draws its own HUD, under the view's scissor, the last the frame set:
+// there it is by where the rectangle sits in the view, and the side is the view's (rt64-3-auto-anchor-hud.patch).
 extern "C" void turok_hud_begin(uint8_t* rdram) {
     hud_open = false;
     uint32_t head;
@@ -380,12 +385,38 @@ extern "C" void turok_hud_begin(uint8_t* rdram) {
     if (!screen_scissor(rdram, head, &lrx, &lry)) {
         return;
     }
+    uint32_t view_w0 = 0, view_w1 = 0, width = 0; // the last G_SETSCISSOR, and the colour image's width, in 10.2
+    for (uint32_t a = frame_start; a < head; a += 8) {
+        Command c = read(rdram, a);
+        if ((c.w0 >> 24) == 0xED) {
+            view_w0 = c.w0;
+            view_w1 = c.w1;
+        } else if ((c.w0 >> 24) == 0xFF) {
+            width = ((c.w0 & 0xFFF) + 1) * 4;
+        }
+    }
+    // The HUD's scissor reaches at least a 4:3 screen's bottom. RT64 narrows a framebuffer pair to 4:3, and so widens
+    // its view and HUD, only if the scissors it drew under are 4:3-shaped, and a top view's HUD comes before the frame
+    // sets any scissor below it: Turok 2's two players' top half (0,0)-(480,179) and its HUD's scissor to row 179 made
+    // a pair 480x179, drawn stretched across the window, its HUD and 3D both.
+    lry = lry > width * 3 / 4 ? lry : width * 3 / 4;
+    uint32_t v_ulx = (view_w0 >> 12) & 0xFFF, v_uly = view_w0 & 0xFFF;
+    uint32_t v_lrx = (view_w1 >> 12) & 0xFFF, v_lry = view_w1 & 0xFFF;
+    // A view of a split screen: narrower than the screen, or less than nine tenths of a 4:3 screen high (Turok 3's
+    // screen is 284x222, a little taller than 4:3; Turok 2's two players are halves 480 wide and 178 high).
+    bool view = width > 0 && v_lrx > v_ulx && v_lry > v_uly &&
+                (v_ulx > 4 || v_lrx + 4 < width || (v_lry - v_uly) * 40 < width * 27);
     Writer dl{ rdram, head };
     dl.enable();
     dl.cmd(0x64000017, 0); // gEXPushScissor
     dl.cmd(0x64000005, (kOriginLeft << 2) | (kOriginRight << 14)); // gEXSetScissor(G_SC_NON_INTERLACE, LEFT, RIGHT,
     dl.cmd(0, lry & 0xFFFF);                                         //   0, 0, 0, lry)
-    dl.cmd(0x64000034, 1); // gEXSetAutoAnchor(on)
+    if (view) {
+        dl.cmd(0x64000034, 2);                       // gEXSetAutoAnchor(in a view,
+        dl.cmd((v_ulx << 16) | v_uly, (v_lrx << 16) | v_lry); //   ulx, uly, lrx, lry)
+    } else {
+        dl.cmd(0x64000034, 1); // gEXSetAutoAnchor(on)
+    }
     dl.finish();
     hud_open = true;
 }

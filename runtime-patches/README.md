@@ -20,7 +20,12 @@ applied a patch since edited, renamed or removed takes the new one without being
 - `rt64-3-auto-anchor-hud.patch`: an extended GBI command, gEXSetAutoAnchor (G_EX_SETAUTOANCHOR_V1, 0x34), that has
   RT64 anchor each 2D rectangle with no alignment of its own to the side it's nearest by where it sits, or stretch it
   across the window when it is half the screen wide or more, for the HUD in widescreen (`src/widescreen.cpp`,
-  `docs/widescreen.md`). From PaxDino.
+  `docs/widescreen.md`). From PaxDino. Its mode 2, a word pair longer, gives a view of a split screen (its scissor,
+  ulx, uly, lrx, lry in 10.2): then a rectangle is placed by where it sits in that view, and every one but one as wide
+  as the view is anchored to the view's left edge, centre or right edge. The edges follow HUD Placement, as a single
+  view's HUD does. RT64 widens a split screen's views to the window's edges, so a view's centre, and a centred
+  rectangle's scissor, are fractions of the whole window rather than of the width HUD Placement gives the HUD (a draw
+  call's `rectWindowOrigins`): a quarter's crosshair stays at the quarter's centre at 21:9.
 - `rt64-4-l3dex-reads-as-f3dex.patch`: RT64 reads display lists for L3DEX 1.x, F3DEX's line microcode, with F3DEX's
   commands, and takes its G_LINE3D (0xB5, F3DEX's G_QUAD) as drawing nothing, as it already does for L3DEX2's. It knew
   L3DEX 1.x by its hash, but as an unknown microcode, which gave it only the RDP's commands: a list that loaded it never
