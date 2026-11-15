@@ -1,0 +1,71 @@
+diff --git a/src/hle/rt64_draw_call.h b/src/hle/rt64_draw_call.h
+index c0b54f0..7f911a6 100644
+--- a/src/hle/rt64_draw_call.h
++++ b/src/hle/rt64_draw_call.h
+@@ -80,6 +80,7 @@ namespace RT64 {
+         uint16_t rectLeftOrigin;
+         uint16_t rectRightOrigin;
+         bool rectWindowOrigins;
++        bool rectInView; // drawn under gEXSetAutoAnchor's mode 2: a HUD placed in a view of a split screen
+         FixedRect scissorRect;
+         uint16_t scissorLeftOrigin;
+         uint16_t scissorRightOrigin;
+diff --git a/src/hle/rt64_rdp.cpp b/src/hle/rt64_rdp.cpp
+index 5a97f1d..d6df697 100644
+--- a/src/hle/rt64_rdp.cpp
++++ b/src/hle/rt64_rdp.cpp
+@@ -1408,6 +1408,7 @@ namespace RT64 {
+         drawCall.rectLeftOrigin = extAlignment.leftOrigin;
+         drawCall.rectRightOrigin = extAlignment.rightOrigin;
+         drawCall.rectWindowOrigins = extAlignment.windowOrigins;
++        drawCall.rectInView = (extended.autoAnchor == 2);
+         drawCall.rectAspect = extended.global.rectAspect;
+ 
+         if (flushedState) {
+diff --git a/src/hle/rt64_state.cpp b/src/hle/rt64_state.cpp
+index a8cc0bd..583fb42 100644
+--- a/src/hle/rt64_state.cpp
++++ b/src/hle/rt64_state.cpp
+@@ -116,6 +116,7 @@ namespace RT64 {
+         drawCall.rectLeftOrigin = G_EX_ORIGIN_NONE;
+         drawCall.rectRightOrigin = G_EX_ORIGIN_NONE;
+         drawCall.rectWindowOrigins = false;
++        drawCall.rectInView = false;
+         drawCall.rectAspect = G_EX_ASPECT_AUTO;
+         drawCall.scissorRect.reset();
+         drawCall.scissorMode = 0;
+@@ -3068,6 +3069,25 @@ namespace RT64 {
+                 drawsAny = drawsAny || !workload.fbPairs[f].drawColorRect.isEmpty();
+             }
+ 
++#           if RT64_PARTIAL_SCREEN_PAIRS
++            // A split screen whose views the game's widescreen code places itself: a workload that drew a HUD in a
++            // view (gEXSetAutoAnchor's mode 2, the Turok games' split screen). Each view is a pair of its own, or
++            // several (its world, its weapon, its HUD, its border, each after a G_SETCIMG of the game's or the
++            // engine's), drawn in the same task as the rest of the frame, and each is judged by its own scissor, as
++            // without RT64_PARTIAL_SCREEN_PAIRS: by the whole screen, a view's world and weapon were narrowed to 4:3
++            // around the window's centre while its HUD went out to the view's widened edges.
++            bool viewsPlaced = false;
++            for (uint32_t f = 0; (f < workload.fbPairCount) && !viewsPlaced; f++) {
++                const FramebufferPair &fbPair = workload.fbPairs[f];
++                for (uint32_t p = 0; (p < fbPair.projectionCount) && !viewsPlaced; p++) {
++                    const Projection &proj = fbPair.projections[p];
++                    for (uint32_t c = 0; (c < proj.gameCallCount) && !viewsPlaced; c++) {
++                        viewsPlaced = proj.gameCalls[c].callDesc.rectInView;
++                    }
++                }
++            }
++#           endif
++
+             for (ShownFramebuffer &shown : shownFramebuffers) {
+                 if (shown.address == 0) {
+                     continue;
+@@ -3099,7 +3119,7 @@ namespace RT64 {
+                     // board camera is through Mario Party 3's sideways wipe) are judged as before.
+                     const int32_t screenWidth = int32_t(fbPair.colorImage.width) << 2;
+                     const int32_t screenHeight = int32_t(workload.viFbSize.y) << 2;
+-                    if (drawsEntry && (screenHeight > 0) && !fbPair.scissorRect.isNull() && ((fbPair.scissorRect.lrx - fbPair.scissorRect.ulx) * 10 < screenWidth * 9)) {
++                    if (drawsEntry && !viewsPlaced && (screenHeight > 0) && !fbPair.scissorRect.isNull() && ((fbPair.scissorRect.lrx - fbPair.scissorRect.ulx) * 10 < screenWidth * 9)) {
+                         bool extendedScissor = false;
+                         for (uint32_t p = 0; (p < fbPair.projectionCount) && !extendedScissor; p++) {
+                             const Projection &proj = fbPair.projections[p];
