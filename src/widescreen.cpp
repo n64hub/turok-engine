@@ -36,6 +36,8 @@ namespace {
         uint32_t w0, w1;
     };
 
+    Command hud_cimg = {}; // in a split screen's view, the colour image its HUD draws to; else w0 0
+
     Command read(uint8_t* rdram, uint32_t address) {
         return { (uint32_t)MEM_W(0, (gpr)(int32_t)address), (uint32_t)MEM_W(4, (gpr)(int32_t)address) };
     }
@@ -55,6 +57,12 @@ namespace {
         }
         void finish() {
             MEM_W(0, (gpr)(int32_t)head_var) = (int32_t)head;
+        }
+        // The colour image set to another address and back, nothing drawn between: RT64 starts a framebuffer pair at
+        // the next draw (Split screen in docs/widescreen.md). It takes a G_SETCIMG that changes nothing as no change.
+        void new_pair(Command cimg) {
+            cmd(cimg.w0, 0);
+            cmd(cimg.w0, cimg.w1);
         }
     };
 
@@ -386,12 +394,14 @@ extern "C" void turok_hud_begin(uint8_t* rdram) {
         return;
     }
     uint32_t view_w0 = 0, view_w1 = 0, width = 0; // the last G_SETSCISSOR, and the colour image's width, in 10.2
+    Command cimg = {};                             // the last G_SETCIMG
     for (uint32_t a = frame_start; a < head; a += 8) {
         Command c = read(rdram, a);
         if ((c.w0 >> 24) == 0xED) {
             view_w0 = c.w0;
             view_w1 = c.w1;
         } else if ((c.w0 >> 24) == 0xFF) {
+            cimg = c;
             width = ((c.w0 & 0xFFF) + 1) * 4;
         }
     }
@@ -408,6 +418,14 @@ extern "C" void turok_hud_begin(uint8_t* rdram) {
                 (v_ulx > 4 || v_lrx + 4 < width || (v_lry - v_uly) * 40 < width * 27);
     Writer dl{ rdram, head };
     dl.enable();
+    // In a view, the HUD is a framebuffer pair of its own, apart from the weapon drawn before it, which follows the
+    // view's second Z clear: in the HUD's pair, the weapon's viewport doesn't span the pair's scissor, and RT64 narrowed
+    // it to 4:3 around the window's centre (a right-hand quarter's at 21:9 ended at the 4:3 picture's edge, a quarter of
+    // the view short of the window's). Judged by the view's own scissor, as the view's world is, it is widened with it.
+    hud_cimg = view && cimg.w1 != 0 ? cimg : Command{};
+    if (hud_cimg.w0 != 0) {
+        dl.new_pair(hud_cimg);
+    }
     dl.cmd(0x64000017, 0); // gEXPushScissor
     dl.cmd(0x64000005, (kOriginLeft << 2) | (kOriginRight << 14)); // gEXSetScissor(G_SC_NON_INTERLACE, LEFT, RIGHT,
     dl.cmd(0, lry & 0xFFFF);                                         //   0, 0, 0, lry)
@@ -434,5 +452,10 @@ extern "C" void turok_hud_end(uint8_t* rdram) {
     dl.enable();
     dl.cmd(0x64000034, 0); // gEXSetAutoAnchor(off)
     dl.cmd(0x64000018, 0); // gEXPopScissor
+    // And what a view draws after its HUD, its border, a pair of its own: in the HUD's, the line between a top and a
+    // bottom quarter, a fill as wide as the quarter, stopped at the 4:3 picture's edges.
+    if (hud_cimg.w0 != 0) {
+        dl.new_pair(hud_cimg);
+    }
     dl.finish();
 }
