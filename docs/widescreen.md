@@ -100,6 +100,16 @@ world's is, and widened with it; the border's fills as wide as the view are wide
 pair the line between a top and a bottom quarter stopped at the 4:3 picture's edges. A frame of one view is left as it
 was: its weapon's viewport spans the screen. Turok 2's two players draw no weapon in either half.
 
+On the web page, RT64 is built with N64Recomp-browser's `RT64_PARTIAL_SCREEN_PAIRS` (always on with Emscripten), which
+judges a pair that draws into the shown framebuffer under scissors narrower than nine tenths of its width by the whole
+screen, unless it drew under an extended scissor: a game that sends a view in an RSP task of its own (Mario Party 3)
+gets it kept at 4:3 beside the rest of the screen. A view's world and weapon are such pairs (only its HUD's scissor is
+extended), so on the page the views stayed in the 4:3 picture, black beside them, while their HUDs went out to the
+widened views' edges and the right-hand views' counters off the window. `runtime-patches/rt64-6-split-screen-views-judged-by-their-own-scissors.patch`
+leaves every pair of a task that drew a HUD in a view (gEXSetAutoAnchor's mode 2) to be judged by its own scissor, as
+the desktop does. The engine can't mark the world and weapon pairs themselves: they are drawn before a view's first
+hook (its HUD), and an extended scissor with origins would follow HUD Placement, cutting the outer views at 21:9.
+
 In a view the HUD's rectangles are anchored by where they sit in the view, not on the screen: `turok_hud_begin` gives
 RT64 the view's scissor (gEXSetAutoAnchor's mode 2), and the view's counters go to its edges and its crosshair stays at
 its centre. A view's edges follow HUD Placement, as one view's HUD does, so at 21:9 the outer counters stop at 16:9's

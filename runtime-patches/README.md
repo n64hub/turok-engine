@@ -37,6 +37,11 @@ applied a patch since edited, renamed or removed takes the new one without being
   line's two ends that RSPModifyCS, which already moves G_MW_POINTS's vertices on the screen, moves off the line by half
   its width after the transform: the lines move with the camera, frame interpolation and widescreen as triangles do.
   Turok 1 draws its map (L) with L3DEX 1.00; Turok 2, 3 and Rage Wars carry L3DEX2.
+- `rt64-6-split-screen-views-judged-by-their-own-scissors.patch`: on the web page (N64Recomp-browser's
+  `RT64_PARTIAL_SCREEN_PAIRS`, always on with Emscripten) a split screen's views are judged by their own scissors, as
+  on the desktop, in a task that drew a HUD in a view (gEXSetAutoAnchor's mode 2, a draw call's `rectInView`). By the
+  whole screen, Turok 2's and 3's views' world and weapon stayed in the 4:3 picture at 16:9 and 21:9 while their HUDs
+  went out to the widened views' edges (`docs/widescreen.md`, Split screen). Other games' pairs are judged as before.
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
