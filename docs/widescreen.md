@@ -88,6 +88,18 @@ the screen's top down to at least a 4:3 screen's bottom (so a top view's pair is
 frame has set any scissor below it), and the view's pair draws its HUD under it. Each view is then widened to the
 window's edges, and the window beside the narrower ones holds the view, not an old frame.
 
+A view clears its Z buffer twice, before its world and again before its weapon, so its weapon and its HUD would share a
+pair, judged by the HUD's scissor as the whole screen. RT64 widens a projection with its pair only if its viewport spans
+the pair's scissor, and the weapon's, the view's, doesn't: it was narrowed to 4:3 around the window's centre, and a
+right-hand quarter's weapon at 21:9 ended at the 4:3 picture's edge, a quarter of the view short of the window's (the
+left-hand quarters' happened to land right, their edge being the window's centre). So in a view `turok_hud_begin`
+makes the HUD a pair of its own, and `turok_hud_end` makes what follows it, the view's border, another: the colour
+image set to another address and straight back, nothing drawn between, which RT64 takes as a new pair at the next draw
+(a G_SETCIMG that changes nothing it takes as no change). The weapon's pair is then judged by the view's scissor, as the
+world's is, and widened with it; the border's fills as wide as the view are widened with the view, where in the HUD's
+pair the line between a top and a bottom quarter stopped at the 4:3 picture's edges. A frame of one view is left as it
+was: its weapon's viewport spans the screen. Turok 2's two players draw no weapon in either half.
+
 In a view the HUD's rectangles are anchored by where they sit in the view, not on the screen: `turok_hud_begin` gives
 RT64 the view's scissor (gEXSetAutoAnchor's mode 2), and the view's counters go to its edges and its crosshair stays at
 its centre. A view's edges follow HUD Placement, as one view's HUD does, so at 21:9 the outer counters stop at 16:9's
