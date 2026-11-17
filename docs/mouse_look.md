@@ -11,12 +11,18 @@ far, and a look up or down drifts back as soon as the mouse stops.
 movement to the engine at each poll, instead of adding it to the stick. A hook in the game's look code then adds that
 movement to the player's angles, in the same frame, by as much as the mouse moved.
 
+A pad's stick has the other half of the same trouble where the look springs back (Turok 2 and 3): the stick sets the
+angle the view looks up or down at, the view eases towards it, a third of the way in a quarter of a second and nine
+tenths in about 1.4 s, and it eases back level as soon as the stick is let go. Aiming up or down lags behind the
+stick, and an aim can't be held. `turok_spring_look` makes the stick tilt the view at a rate instead, at once, and
+leaves the view where the stick lets go of it, as a twin-stick shooter does and as Turok 1's look does.
+
 ## What a game does
 
 - Its `get_input`, for player 1 while mouse look is on, hands the frontend's mouse deltas (already scaled by the Mouse
   Sensitivity setting) to `turok::add_mouse_motion` and leaves the stick to the controller and the keyboard.
-- It hooks its look code, which runs once a frame while the player has control, with `turok_mouse_look`. The hook
-  passes:
+- It hooks its look code, which runs once a frame while the player has control, with `turok_mouse_look`, or with
+  `turok_spring_look` where the look springs back. The hook passes:
   - the address of the yaw, a float in radians that grows to the right;
   - the address of the pitch, a float in radians that grows upwards;
   - the limits of the pitch;
@@ -37,13 +43,23 @@ The held amount is dropped when the game sets the pitch level itself (a respawn,
 look has not run for half a second (a cinematic, a level loading). Movement made while the look is not running (the
 pause menu, the menus between levels) is dropped too, so it does not turn the view when the player comes back.
 
+## The stick's look up and down
+
+`turok_spring_look` reads the stick from the target the game makes of it: the target as a share of the limit it points
+towards is the stick's deflection, which tilts the view by up to 2.4 radians a second (about 140 degrees, two thirds
+of how fast Turok 2 turns with the stick), times the time since the look last ran, at most a tenth of a second so a
+hitch doesn't throw the view. `held_pitch` is then the whole target, the stick's tilt and the mouse's together: the
+game's own target is replaced by it, the pitch is moved with it at once, and it stays where the two leave it. It's
+dropped as above: the view goes back level after a respawn, a level's start, a cinematic or a load. Turning left and
+right is the game's own, which already turns at a rate and at once.
+
 ## The games' hooks
 
-| Game | Look code | Hook before | Yaw | Pitch | Target |
-|---|---|---|---|---|---|
-| Turok 2 | func_0024EF70 | 0x0024F14C | s2 + 0x50 | s1 + 0xAC8 | a1; limits at s0 + 0x10, + 0x14 |
-| Turok 3 | func_002CF978 | 0x002CFBF4 | s2 + 0x6C | s0 + 0xDD0 | a1; limits at s1 + 0x10, + 0x14 |
-| Turok 1 | func_80052B1C | 0x80053688 | *(sp + 0xB4) + 0x64 | s0 + 0x70 | s0 + 0x68; limits -1.3614, pi/2 |
+| Game | Look code | Hook before | Hook | Yaw | Pitch | Target |
+|---|---|---|---|---|---|---|
+| Turok 2 | func_0024EF70 | 0x0024F14C | spring | s2 + 0x50 | s1 + 0xAC8 | a1; limits at s0 + 0x10, + 0x14 |
+| Turok 3 | func_002CF978 | 0x002CFBF4 | spring | s2 + 0x6C | s0 + 0xDD0 | a1; limits at s1 + 0x10, + 0x14 |
+| Turok 1 | func_80052B1C | 0x80053688 | mouse | *(sp + 0xB4) + 0x64 | s0 + 0x70 | s0 + 0x68; limits -1.3614, pi/2 |
 
 These are the on-foot looks. Swimming and the vehicles have their own, which aren't hooked, so the mouse does not
 turn the view there. Turok 1 has already read its pitch into f12 when the hook runs, so its hook reads it again after
