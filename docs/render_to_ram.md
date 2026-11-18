@@ -35,8 +35,7 @@ the same as with it on.
 ## Measured
 
 Each page built with the copy off against the same game's page with it, in Chrome at 3840x2000 on a desktop GPU,
-played in turn (presents a second, each play's median; plays.jsonl in N64Recomp-browser, sets `t1-r2r-limit`,
-`t2-r2r-limit` and `t2-r2r-display`):
+played in turn (presents a second, each play's median):
 
 | Game | Rate | With the copy | Without it |
 |---|---|---|---|
