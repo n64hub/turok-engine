@@ -11,12 +11,14 @@
 // (Frame interpolation in docs/widescreen.md). After PaxDino's src/game/widescreen.cpp
 // (https://github.com/wootbeer/PaxDino, GPL-3.0), made to work from the frame's own commands instead of Rage Wars'
 // addresses.
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 
 #include "recomp.h"
 #include "ultramodern/config.hpp"
+#include "recompui/recompui.h"
 #include "turok_engine.h"
 
 namespace {
@@ -251,6 +253,20 @@ bool turok::widescreen_active() {
     return ultramodern::renderer::get_graphics_config().ar_option == ultramodern::renderer::AspectRatio::Expand;
 }
 
+// How many times wider than 4:3 the culling lets through with Expand: the picture, which RT64 widens to the window's
+// aspect ratio (never narrower than 4:3), and a tenth of its width past each side. The margin is for the frames RT64
+// draws between the game's: they are drawn from the newer frame's display lists with the camera partway back to the
+// older one's view, so while the player turns their trailing edge can show a little of what the newer frame culled.
+// The culling was a fixed 21:9 before, whatever the window: a 4:3 window drew the world out past its sides where
+// nobody sees it, and a 32:9 one stopped drawing it a good way short of its edges.
+static float culling_scale() {
+    constexpr float kMargin = 1.2f;
+    int width = 0, height = 0;
+    recompui::get_window_size(width, height);
+    const float picture = (width > 0 && height > 0) ? (float(width) / float(height)) / (4.0f / 3.0f) : 1.0f;
+    return std::max(1.0f, picture) * kMargin;
+}
+
 void turok::set_display_list_head(uint32_t address, Microcode microcode) {
     head_var = address;
     hook_opcode = microcode == Microcode::F3DEX ? 0x00 : 0xE0; // G_SPNOOP in each
@@ -280,8 +296,9 @@ extern "C" void turok_frame_begin(uint8_t* rdram) {
 // The camera's culling. The games test what to draw against their own view-projection matrix (a float one, the
 // camera's, which it also converts for the display list), so whatever is outside the 4:3 view isn't drawn, and the
 // sides of a widened picture are missing it. Once the display list's copy is made, the float matrix's x column is
-// scaled so its view is as wide as 21:9: the picture is unchanged and the culling lets through what a window up to that
-// wide shows. First, at any width, the matrix's view is held up to the last frame's for a camera cut (note_camera).
+// scaled so its view is as wide as the window and a margin (culling_scale()): the picture is unchanged and the culling
+// lets through what the window shows. First, at any width, the matrix's view is held up to the last frame's for a camera
+// cut (note_camera).
 extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
     if (matrix == 0) {
         return;
@@ -290,7 +307,7 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
     if (!turok::widescreen_active()) {
         return;
     }
-    constexpr float kScale = (4.0f / 3.0f) / (21.0f / 9.0f);
+    const float kScale = 1.0f / culling_scale();
     for (uint32_t row = 0; row < 4; row++) {
         uint32_t a = matrix + row * 16; // [row][0]: clip x = sum of v[row] * m[row][0]
         float f;
@@ -306,13 +323,13 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 // and its far corners from the field of view, which it then moves into the world and takes its side planes and bounding
 // box from: the level's rooms are chosen against that. Turok 2's is 4:3 and a third wider than its view, so a picture
 // wider than about 16:9 had the level missing at its sides, whatever the matrix let through. Each point's x (a float,
-// every 12 bytes from points) is scaled as turok_widen_culling scales the matrix, so the pyramid takes in what a window
-// up to 21:9 shows.
+// every 12 bytes from points) is scaled as turok_widen_culling scales the matrix, so the pyramid takes in what the
+// window shows.
 extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t count) {
     if (!turok::widescreen_active() || points == 0) {
         return;
     }
-    constexpr float kScale = (21.0f / 9.0f) / (4.0f / 3.0f);
+    const float kScale = culling_scale();
     for (uint32_t i = 0; i < count; i++) {
         uint32_t a = points + i * 12;
         float f;
