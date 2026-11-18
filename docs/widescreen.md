@@ -175,7 +175,7 @@ for the frames RT64 draws between the game's, from the newer frame's display lis
 older one's view: while the player turns, their trailing edge can show a little of what the newer frame culled. Only
 while Expand is on. It was a fixed 21:9 until the games' 2a sides were checked against a 4:3 window: a 4:3 window then
 drew the world out past its sides where nobody sees it, as much as a 32:9 one, whose picture went on a good way past
-where the world stopped being drawn (N64Recomp-browser's `tools/frame_check.mjs`, Turok 1's first level x1.00).
+where the world stopped being drawn (a check of the frames by machine, Turok 1's first level x1.00).
 
 The level is culled a second way, apart from that matrix. The camera makes a view pyramid in its own space, five points
 (the eye, then four far corners from the field of view, 4:3), moves it into the world and takes from it the side
