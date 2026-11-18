@@ -44,5 +44,4 @@ this repo's CI builds that game's `main`; a game's PR that moves the pin lands a
 
 A change here reaches players only in a game's release, so it isn't done when it merges: the game's PR that moves the
 pin onto it adds its line to that game's `releases/next.md`, and the work that lands it releases the game, unasked, or
-waits for a release already in flight, which carries it (N64Recomp-browser's CLAUDE.md, Releasing). A fix in a game's
-own repo is released the same way.
+waits for a release already in flight, which carries it. A fix in a game's own repo is released the same way.
