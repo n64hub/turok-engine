@@ -31,6 +31,12 @@ namespace {
     // mouse held the view at is let go.
     constexpr auto kAway = std::chrono::milliseconds(500);
 
+    // How fast the stick tilts a springing look up or down, pushed all the way (turok_spring_look): in radians a
+    // second, about 140 degrees, two thirds of how fast Turok 2 turns with it (0.132 radians a frame at 30 a second).
+    constexpr float kStickPitchRate = 2.4f;
+    // The longest a frame of the look counts for at that rate: a hitch doesn't throw the view up or down.
+    constexpr float kLongestFrame = 0.1f;
+
     std::mutex mutex;
     float pending_x = 0.0f;    // counts to the right since the look last ran
     float pending_y = 0.0f;    // counts down
@@ -74,14 +80,17 @@ void turok::add_mouse_motion(float dx, float dy) {
     pending_y += dy;
 }
 
-extern "C" void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
-    gpr* pitch_target, float pitch_min, float pitch_max) {
+// Both hooks: stick_is_rate for a look that springs back, whose target the stick is made to tilt instead.
+static void look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale, gpr* pitch_target,
+    float pitch_min, float pitch_max, bool stick_is_rate) {
     float dx, dy;
     bool away;
+    float seconds;
     {
         std::lock_guard lock{ mutex };
         Clock::time_point now = Clock::now();
         away = now - last_look > kAway;
+        seconds = away ? 0.0f : std::min(std::chrono::duration<float>(now - last_look).count(), kLongestFrame);
         last_look = now;
         dx = pending_x;
         dy = pending_y;
@@ -110,6 +119,13 @@ extern "C" void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, 
         held_pitch = 0.0f;
     }
     float target = register_float(pitch_target);
+    if (stick_is_rate) {
+        // The stick's target, as a share of the way to the limit it points at, is how fast it tilts the view instead:
+        // held_pitch is then the whole target, the stick's tilt and the mouse's together, and stays where they leave it.
+        float tilt = target > 0.0f ? target / pitch_max : target < 0.0f ? target / -pitch_min : 0.0f;
+        turn += tilt * kStickPitchRate * pitch_scale * seconds;
+        target = 0.0f;
+    }
     float held = std::clamp(held_pitch + turn, pitch_min - target, pitch_max - target);
     float moved = held - held_pitch;
     held_pitch = held;
@@ -117,4 +133,14 @@ extern "C" void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, 
         write_float(rdram, pitch, std::clamp(angle + moved, pitch_min, pitch_max));
     }
     set_register_float(pitch_target, std::clamp(target + held_pitch, pitch_min, pitch_max));
+}
+
+extern "C" void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
+    gpr* pitch_target, float pitch_min, float pitch_max) {
+    look(rdram, yaw, yaw_scale, pitch, pitch_scale, pitch_target, pitch_min, pitch_max, false);
+}
+
+extern "C" void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
+    gpr* pitch_target, float pitch_min, float pitch_max) {
+    look(rdram, yaw, yaw_scale, pitch, pitch_scale, pitch_target, pitch_min, pitch_max, true);
 }

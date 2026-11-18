@@ -94,6 +94,10 @@ extern "C" {
     // about to move the pitch towards, which the mouse holds further; nullptr for a pitch that stays where it's put.
     void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
         gpr* pitch_target, float pitch_min, float pitch_max);
+    // mouse_look.cpp: turok_mouse_look for a look that springs back, whose target the game makes of the stick's
+    // deflection: that deflection tilts the view up or down at a rate instead, and the view stays where it's left.
+    void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
+        gpr* pitch_target, float pitch_min, float pitch_max);
 }
 
 #endif
