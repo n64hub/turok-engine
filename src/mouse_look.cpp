@@ -7,14 +7,22 @@
 // how far. Here a game hands the engine the mouse's movement at each poll (add_mouse_motion), and its look code, which
 // runs once a frame while the player has control, calls turok_mouse_look with where the player's angles are: the
 // movement is added to them there, so it turns the view by as much as the mouse moved, at once.
+//
+// The stick keeps the game's own turn, at its own speed, scaled by the General tab's Stick Sensitivity
+// (add_stick_sensitivity_option): a game's hooks multiply the stick's deflection by turok_stick_sensitivity where its
+// look code reads it to turn and to look up and down, so the view turns faster or slower for the same push, and faster
+// than the game's own at a full push, while the menus, which read the stick apart from the look, move as they did.
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <string>
 
 #include "recomp.h"
+#include "recompui/config.h"
 #include "turok_engine.h"
 
 namespace {
@@ -36,6 +44,10 @@ namespace {
     constexpr float kStickPitchRate = 2.4f;
     // The longest a frame of the look counts for at that rate: a hitch doesn't throw the view up or down.
     constexpr float kLongestFrame = 0.1f;
+
+    const std::string stick_sensitivity_option = "stick_sensitivity";
+    // The setting, as a factor: read from the config at each change, so the look reads a float a frame.
+    std::atomic<float> stick_sensitivity{ 1.0f };
 
     std::mutex mutex;
     float pending_x = 0.0f;    // counts to the right since the look last ran
@@ -78,6 +90,29 @@ void turok::add_mouse_motion(float dx, float dy) {
     }
     pending_x += dx;
     pending_y += dy;
+}
+
+void turok::add_stick_sensitivity_option(recomp::config::Config& general) {
+    general.add_number_option(
+        stick_sensitivity_option,
+        "Stick Sensitivity",
+        "How fast the control stick turns the view and looks up and down, pushed the same way: 100% is the game's own, "
+        "and more turns faster than the game does with the stick pushed all the way. The <b>Joystick Deadzone</b> "
+        "above sets how far the stick goes before it turns at all. It doesn't change the mouse, which has its own "
+        "sensitivity, nor the menus.",
+        10, 300, 5, 0, true, 100);
+    // Called on load too, with the saved value, and at each change.
+    general.add_option_change_callback(stick_sensitivity_option,
+        [](recomp::config::ConfigValueVariant cur_value, recomp::config::ConfigValueVariant,
+           recomp::config::OptionChangeContext) {
+            if (const double* percent = std::get_if<double>(&cur_value)) {
+                stick_sensitivity.store((float)(*percent / 100.0));
+            }
+        });
+}
+
+extern "C" float turok_stick_sensitivity(void) {
+    return stick_sensitivity.load(std::memory_order_relaxed);
 }
 
 // Both hooks: stick_is_rate for a look that springs back, whose target the stick is made to tilt instead.
