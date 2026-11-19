@@ -23,6 +23,8 @@ says so.
 - `docs/rom_layout.md`: where the games' code is in the ROM, where it runs (the TLB mappings), and what that means for
   the symbols, the runtime and the web.
 - `docs/render_to_ram.md`: why the games run without RT64's copy of each frame into RDRAM, and how that was checked.
+- `docs/input_lag.md`: where the time from a press to the picture goes in the games' own frames, and what Turok 2's
+  order and pacing cost it.
 - `tools/gen_syms.py`: the function finder. It writes a game's `syms/` (the symbols N64Recomp reads) from the ROM
   and the game's `syms/layout.toml`, with no decompilation: spimdisasm's functions, jal targets, code pointers made
   in code and in data, stack-frame setups, the gaps between, with jump tables' case labels and the data fragments the
@@ -49,6 +51,9 @@ says so.
   (`turok::add_mouse_motion`, `turok_spring_look`, `docs/mouse_look.md`), and the General tab's
   Stick Sensitivity, which scales how fast the stick turns the view (`turok::add_stick_sensitivity_option`,
   `turok_stick_sensitivity`).
+- `src/frame_pacing.cpp`: a frame started a retrace before the one it is swapped in at, instead of right after the swap
+  before it, so it reads the pad and moves the world a retrace (17 ms) later and is shown at the same retrace
+  (`turok_start_frame_late`, `turok_frame_sent`, `turok_retrace`, `docs/input_lag.md`).
 - `src/turok_engine.h`: all of the above, as a game calls it.
 - `tools/submodules.sh`: a game checkout's submodules, filled from a cache of mirrors every checkout on the machine
   shares, in place of `git submodule update --init --recursive`. The first checkout fills the cache; every one after
@@ -86,6 +91,8 @@ Anything else the games share comes here when a change needs it in more than one
   its look code with `turok_spring_look` (`docs/mouse_look.md`).
   One with Stick Sensitivity passes its General tab to `turok::add_stick_sensitivity_option` and hooks where its look
   code reads the stick to multiply it by `turok_stick_sensitivity()` (`docs/mouse_look.md`).
+  A game whose frames are paced by the retraces hooks its frame's start with `turok_start_frame_late`, the end of its
+  frame with `turok_frame_sent` and its retrace handler with `turok_retrace`, and presents early (`docs/input_lag.md`).
 
 ## Changing it
 

@@ -102,6 +102,13 @@ extern "C" {
     // mouse_look.cpp, from a game's hooks in its look code where it reads the stick's deflection to turn or look by:
     // what the deflection is multiplied by, the Stick Sensitivity setting (1 at 100%, and 1 in a game without it).
     float turok_stick_sensitivity(void);
+    // frame_pacing.cpp, from a game's hooks: at its frame's start, before it reads the pad, the frame held until one
+    // retrace is left before its swap (per_frame is the address of the game's retraces a frame is shown for, a word,
+    // and since_swap of its count of retraces since the frame on the screen was swapped in); once the frame is sent
+    // (frame_sent); and at each retrace, in the game's retrace handler (retrace).
+    void turok_start_frame_late(uint8_t* rdram, recomp_context* ctx, uint32_t per_frame, uint32_t since_swap);
+    void turok_frame_sent(uint8_t* rdram);
+    void turok_retrace(uint8_t* rdram);
 }
 
 #endif
