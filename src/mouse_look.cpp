@@ -2,11 +2,12 @@
 // control stick (docs/mouse_look.md).
 //
 // The games turn and look with the stick at a rate, and look up and down with it by an amount that springs back when
-// it's let go (Turok 2 and 3) or that stays (Turok 1). A mouse made into a stick inherits both: each poll's movement is
-// a deflection, so small movements fall into the game's dead zone and a turn depends on how long the mouse moved, not
-// how far. Here a game hands the engine the mouse's movement at each poll (add_mouse_motion), and its look code, which
-// runs once a frame while the player has control, calls turok_mouse_look with where the player's angles are: the
-// movement is added to them there, so it turns the view by as much as the mouse moved, at once.
+// it's let go, all three. A mouse made into a stick inherits both: each poll's movement is a deflection, so small
+// movements fall into the game's dead zone and a turn depends on how long the mouse moved, not how far. Here a game
+// hands the engine the mouse's movement at each poll (add_mouse_motion), and its look code, which runs once a frame
+// while the player has control, calls turok_spring_look with where the player's angles are: the movement is added to
+// them there, so it turns the view by as much as the mouse moved, at once. The stick's look up and down is made a rate
+// there too, so the view stays where the stick leaves it.
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -31,8 +32,7 @@ namespace {
     // mouse held the view at is let go.
     constexpr auto kAway = std::chrono::milliseconds(500);
 
-    // How fast the stick tilts a springing look up or down, pushed all the way (turok_spring_look): in radians a
-    // second, about 140 degrees, two thirds of how fast Turok 2 turns with it (0.132 radians a frame at 30 a second).
+    // How fast the stick tilts the look up or down, pushed all the way: in radians a second, about 140 degrees, two thirds of how fast Turok 2 turns with it (0.132 radians a frame at 30 a second).
     constexpr float kStickPitchRate = 2.4f;
     // The longest a frame of the look counts for at that rate: a hitch doesn't throw the view up or down.
     constexpr float kLongestFrame = 0.1f;
@@ -41,7 +41,7 @@ namespace {
     float pending_x = 0.0f;    // counts to the right since the look last ran
     float pending_y = 0.0f;    // counts down
     Clock::time_point last_look{};
-    float held_pitch = 0.0f;   // for a game whose look springs back: how far the mouse holds it from where the stick would
+    float held_pitch = 0.0f;   // where the stick and the mouse hold the pitch, which the game would spring back level
 
     float read_float(uint8_t* rdram, uint32_t address) {
         uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)address);
@@ -80,9 +80,8 @@ void turok::add_mouse_motion(float dx, float dy) {
     pending_y += dy;
 }
 
-// Both hooks: stick_is_rate for a look that springs back, whose target the stick is made to tilt instead.
-static void look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale, gpr* pitch_target,
-    float pitch_min, float pitch_max, bool stick_is_rate) {
+extern "C" void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
+    gpr* pitch_target, float pitch_min, float pitch_max) {
     float dx, dy;
     bool away;
     float seconds;
@@ -105,42 +104,23 @@ static void look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, 
     // The mouse moved up (dy below 0) looks up.
     float turn = -dy * kRadiansPerCount * pitch_scale;
     float angle = read_float(rdram, pitch);
-    if (pitch_target == nullptr) {
-        if (turn != 0.0f) {
-            write_float(rdram, pitch, std::clamp(angle + turn, pitch_min, pitch_max));
-        }
-        return;
-    }
 
-    // A look that springs back: the game moves the pitch towards a target it makes of the stick, so the mouse holds
-    // the target that much further, within the game's own limits, and moves the pitch with it, at once. What it held
-    // is let go when the game itself set the pitch level (a respawn, a level's start) or the player was away.
+    // The game eases the pitch towards a target it makes of the stick, which springs back level when the stick is let
+    // go. That target, as a share of the way to the limit it points at, is how fast the stick tilts the view instead:
+    // held_pitch is the whole target, the stick's tilt and the mouse's together, within the game's own limits, and the
+    // pitch moves with it, at once, and stays where they leave it. It's let go when the game itself set the pitch level
+    // (a respawn, a level's start) or the player was away.
     if (away || (angle == 0.0f && held_pitch != 0.0f)) {
         held_pitch = 0.0f;
     }
     float target = register_float(pitch_target);
-    if (stick_is_rate) {
-        // The stick's target, as a share of the way to the limit it points at, is how fast it tilts the view instead:
-        // held_pitch is then the whole target, the stick's tilt and the mouse's together, and stays where they leave it.
-        float tilt = target > 0.0f ? target / pitch_max : target < 0.0f ? target / -pitch_min : 0.0f;
-        turn += tilt * kStickPitchRate * pitch_scale * seconds;
-        target = 0.0f;
-    }
-    float held = std::clamp(held_pitch + turn, pitch_min - target, pitch_max - target);
+    float tilt = target > 0.0f ? target / pitch_max : target < 0.0f ? target / -pitch_min : 0.0f;
+    turn += tilt * kStickPitchRate * pitch_scale * seconds;
+    float held = std::clamp(held_pitch + turn, pitch_min, pitch_max);
     float moved = held - held_pitch;
     held_pitch = held;
     if (moved != 0.0f) {
         write_float(rdram, pitch, std::clamp(angle + moved, pitch_min, pitch_max));
     }
-    set_register_float(pitch_target, std::clamp(target + held_pitch, pitch_min, pitch_max));
-}
-
-extern "C" void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
-    gpr* pitch_target, float pitch_min, float pitch_max) {
-    look(rdram, yaw, yaw_scale, pitch, pitch_scale, pitch_target, pitch_min, pitch_max, false);
-}
-
-extern "C" void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
-    gpr* pitch_target, float pitch_min, float pitch_max) {
-    look(rdram, yaw, yaw_scale, pitch, pitch_scale, pitch_target, pitch_min, pitch_max, true);
+    set_register_float(pitch_target, held_pitch);
 }

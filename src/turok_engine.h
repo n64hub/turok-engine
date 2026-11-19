@@ -58,7 +58,7 @@ namespace turok {
 
     // mouse_look.cpp: the mouse's movement since the last poll, in counts scaled by the Mouse Sensitivity setting (the
     // frontend's get_mouse_deltas), from the game's get_input for player 1 while mouse look is on, in place of adding it
-    // to the stick. turok_mouse_look turns the view by it.
+    // to the stick. turok_spring_look turns the view by it.
     void add_mouse_motion(float dx, float dy);
 }
 
@@ -90,12 +90,9 @@ extern "C" {
     // mouse_look.cpp, from a game's hook in its look code, which runs once a frame while the player has control: the
     // mouse's movement since then added to the player's yaw (a float at yaw, in radians times yaw_scale, growing to
     // the right) and pitch (at pitch, radians times pitch_scale, growing upwards), the pitch kept within [pitch_min,
-    // pitch_max]. For a look that springs back, pitch_target is the register holding the float target the game is
-    // about to move the pitch towards, which the mouse holds further; nullptr for a pitch that stays where it's put.
-    void turok_mouse_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
-        gpr* pitch_target, float pitch_min, float pitch_max);
-    // mouse_look.cpp: turok_mouse_look for a look that springs back, whose target the game makes of the stick's
-    // deflection: that deflection tilts the view up or down at a rate instead, and the view stays where it's left.
+    // pitch_max]. pitch_target is the register holding the float target the game is about to ease the pitch towards,
+    // which it makes of the stick's deflection and which springs back level when the stick is let go: that
+    // deflection tilts the view up or down at a rate instead, and the view stays where the stick and the mouse leave it.
     void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
         gpr* pitch_target, float pitch_min, float pitch_max);
 }

@@ -46,7 +46,7 @@ says so.
   the Graphics tab's Copy Frames to RAM option that turns it back on (`docs/render_to_ram.md`).
 - `src/mouse_look.cpp`: the mouse turning the player's view directly, as in a PC shooter, instead of being made into
   the stick, and a look up and down that stays where the stick leaves it, in place of one that springs back
-  (`turok::add_mouse_motion`, `turok_mouse_look`, `turok_spring_look`, `docs/mouse_look.md`).
+  (`turok::add_mouse_motion`, `turok_spring_look`, `docs/mouse_look.md`).
 - `src/turok_engine.h`: all of the above, as a game calls it.
 - `tools/submodules.sh`: a game checkout's submodules, filled from a cache of mirrors every checkout on the machine
   shares, in place of `git submodule update --init --recursive`. The first checkout fills the cache; every one after
@@ -81,7 +81,7 @@ Anything else the games share comes here when a change needs it in more than one
   calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera (`docs/widescreen.md`). A game
   that runs without RT64's copy of each frame into RDRAM passes its Graphics tab to `turok::add_copy_frames_option`
   (`docs/render_to_ram.md`). Its `get_input` hands the mouse's movement to `turok::add_mouse_motion`, and it hooks
-  its look code with `turok_mouse_look`, or `turok_spring_look` for a look that springs back (`docs/mouse_look.md`).
+  its look code with `turok_spring_look` (`docs/mouse_look.md`).
 
 ## Changing it
 
