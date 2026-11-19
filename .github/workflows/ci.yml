@@ -14,15 +14,15 @@ permissions:
 
 jobs:
   t2:
-    uses: n64hub/turok-2-recomp/.github/workflows/ci.yml@main
+    uses: n64hub/turok-2-recomp/.github/workflows/ci.yml@chore/ci-engine-runs-rebuild-only-what-moved-17950638113460000
     with:
       engine-ref: ${{ github.sha }}
   t3:
-    uses: n64hub/turok-3-recomp/.github/workflows/ci.yml@main
+    uses: n64hub/turok-3-recomp/.github/workflows/ci.yml@chore/ci-engine-runs-rebuild-only-what-moved-17950638113460000
     with:
       engine-ref: ${{ github.sha }}
   t1:
-    uses: n64hub/turok-recomp/.github/workflows/ci.yml@main
+    uses: n64hub/turok-recomp/.github/workflows/ci.yml@chore/ci-engine-runs-rebuild-only-what-moved-17950638113460000
     with:
       engine-ref: ${{ github.sha }}
   # tools/submodules.sh on Linux: a game's submodules from an empty cache, then a second checkout from the full one,
