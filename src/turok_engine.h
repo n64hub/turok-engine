@@ -60,6 +60,10 @@ namespace turok {
     // frontend's get_mouse_deltas), from the game's get_input for player 1 while mouse look is on, in place of adding it
     // to the stick. turok_spring_look turns the view by it.
     void add_mouse_motion(float dx, float dy);
+
+    // mouse_look.cpp: the General tab's Stick Sensitivity option (100%, the game's own, by default), which
+    // turok_stick_sensitivity reads. With the General tab, before the config is finalized.
+    void add_stick_sensitivity_option(recomp::config::Config& general);
 }
 
 // The natives a game names in its syms or calls from its N64Recomp hooks.
@@ -95,6 +99,9 @@ extern "C" {
     // deflection tilts the view up or down at a rate instead, and the view stays where the stick and the mouse leave it.
     void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
         gpr* pitch_target, float pitch_min, float pitch_max);
+    // mouse_look.cpp, from a game's hooks in its look code where it reads the stick's deflection to turn or look by:
+    // what the deflection is multiplied by, the Stick Sensitivity setting (1 at 100%, and 1 in a game without it).
+    float turok_stick_sensitivity(void);
 }
 
 #endif

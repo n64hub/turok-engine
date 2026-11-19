@@ -46,6 +46,21 @@ start of a level), or when the look has not run for half a second (a cinematic, 
 the look is not running (the pause menu, the menus between levels) is dropped too, so it does not turn the view when
 the player comes back.
 
+## The stick's sensitivity
+
+The stick turns the view as fast as each game's own look code turns it, and some pads' sticks feel too slow or too
+quick for it. The General tab's Stick Sensitivity (`turok::add_stick_sensitivity_option`, 100% by default, 10-300%)
+scales that: a game hooks its look code where it reads the stick's deflection to turn and to look up and down, just
+before it multiplies it into the turn, and the hook multiplies it by `turok_stick_sensitivity()` too. The same push
+then turns the view that much faster or slower, and at more than 100% a full push turns faster than the game's own.
+The deflection is the game's, after its own dead zone and the frontend's Joystick Deadzone, so those still say where
+the stick starts to turn. The mouse has its own sensitivity and never goes through the stick, and the menus read the
+stick apart from the look code, so neither changes.
+
+| Game | Turn | Look up and down |
+|---|---|---|
+| Turok 2 | f0 before 0x0024F0B4 (the stick's x, from +0xA54 of s1) | f0 before 0x0024F0F0 (its y, from +0xA58) |
+
 ## The games' hooks
 
 | Game | Look code | Hook before | Yaw | Pitch | Target |
