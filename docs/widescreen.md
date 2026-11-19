@@ -31,7 +31,12 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
     quarter does too: Turok 3's "New Objective" in the Breach, "New O" at the left and "bjective" at the right. A game
     whose messages are drawn apart from its counters draws them after `turok_hud_end` (Turok 1's us.toml); one that
     draws them among its counters closes the HUD around each, `turok_hud_end` where it starts and `turok_hud_begin`
-    where it returns (Turok 3's us.toml). Either way they are centred as at 4:3.
+    where it returns (Turok 3's us.toml). Either way they are centred as at 4:3. Turok 2's weapon menu is the same:
+    pictures of the weapons in a ring round the middle of the screen, a few rectangles each, drawn in its HUD, so in a
+    wide window each rectangle went to a side by where it sat and the ring came apart, the claw's blades a weapon's
+    width from its hand. Its HUD is closed before the call that draws the menu and the health counter after it, and
+    opened again between the two, and where the paths that skip the menu meet, after the call: `turok_hud_begin` does
+    nothing while the HUD is open, as `turok_hud_end` does while it is closed.
 - At the end of the frame (`turok_frame_end`): the border the games draw round the screen, whose fill rectangles at the
   old 4:3 edges would be lines down the widened picture. Each vertical G_FILLRECT at most 4 pixels wide and a quarter
   of the screen high or more, at the left or right edge, becomes a no-op. So does each horizontal one at most 4 pixels
