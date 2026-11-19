@@ -42,6 +42,10 @@ applied a patch since edited, renamed or removed takes the new one without being
   on the desktop, in a task that drew a HUD in a view (gEXSetAutoAnchor's mode 2, a draw call's `rectInView`). By the
   whole screen, Turok 2's and 3's views' world and weapon stayed in the 4:3 picture at 16:9 and 21:9 while their HUDs
   went out to the widened views' edges (`docs/widescreen.md`, Split screen). Other games' pairs are judged as before.
+- `RecompFrontend-1-msaa-8x.patch`: the Graphics tab's MS Anti-Aliasing offers 8X beside None, 2X and 4X, greyed out
+  where the GPU can't take 8 samples, as 4X already is where it can't take 4. RT64 draws 8X with its own sample
+  positions, as it does 2X and 4X; upstream RecompFrontend leaves the choice out. 2X stays the default. On a web page
+  WebGPU offers no MSAA RT64 can use, so the option stays greyed out there.
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
