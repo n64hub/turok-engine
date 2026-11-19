@@ -399,8 +399,12 @@ extern "C" void turok_frame_end(uint8_t* rdram) {
 // were drawn to), and automatic anchoring on, which puts each HUD rectangle at the side it's nearest by where it sits
 // on the screen. In a split screen each view draws its own HUD, under the view's scissor, the last the frame set:
 // there it is by where the rectangle sits in the view, and the side is the view's (rt64-3-auto-anchor-hud.patch).
+// While the HUD is open it does nothing, as turok_hud_end does while it is closed: a game that closes the HUD around
+// something drawn in it only on some paths (Turok 2's weapon menu) opens it again where the paths meet.
 extern "C" void turok_hud_begin(uint8_t* rdram) {
-    hud_open = false;
+    if (hud_open) {
+        return;
+    }
     uint32_t head;
     if (!turok::widescreen_active() || !head_valid(rdram, &head)) {
         return;
