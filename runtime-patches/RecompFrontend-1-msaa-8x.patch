@@ -1,0 +1,23 @@
+diff --git a/recompui/src/config/ui_config_tab_graphics.cpp b/recompui/src/config/ui_config_tab_graphics.cpp
+index 4fdf81f..4884bdc 100644
+--- a/recompui/src/config/ui_config_tab_graphics.cpp
++++ b/recompui/src/config/ui_config_tab_graphics.cpp
+@@ -74,7 +74,7 @@ namespace recompui {
+             {ultramodern::renderer::Antialiasing::None, "None"},
+             {ultramodern::renderer::Antialiasing::MSAA2X, "MSAA2X", "2X"},
+             {ultramodern::renderer::Antialiasing::MSAA4X, "MSAA4X", "4X"},
+-            // {ultramodern::renderer::Antialiasing::MSAA8X, "MSAA8X"},
++            {ultramodern::renderer::Antialiasing::MSAA8X, "MSAA8X", "8X"},
+         };
+ 
+         static EnumOptionVector refresh_rate_options = {
+@@ -199,6 +199,9 @@ namespace recompui {
+                 if (max_msaa < RT64::UserConfiguration::Antialiasing::MSAA4X) {
+                     config.update_enum_option_disabled(graphics::options::msaa_option, static_cast<uint32_t>(ultramodern::renderer::Antialiasing::MSAA4X), true);
+                 }
++                if (max_msaa < RT64::UserConfiguration::Antialiasing::MSAA8X) {
++                    config.update_enum_option_disabled(graphics::options::msaa_option, static_cast<uint32_t>(ultramodern::renderer::Antialiasing::MSAA8X), true);
++                }
+             }
+         }
+ 
