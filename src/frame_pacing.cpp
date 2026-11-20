@@ -21,6 +21,12 @@
 // Buffering, at that retrace, RT64 dropped the frame it interpolates after it for about one frame in three. At any other
 // count (the cutscenes' four) it presents with Skip Buffering, which spaces the interpolated frames evenly where
 // presenting early shows a frame for a few retraces and then the ones between it and the next in a burst.
+//
+// A frame the game sends as more than one task (Turok 2's with its map open: the world, then the map's lines in a
+// task of their own) is presented as v0.2.15 presented every frame: with Skip Buffering, and started at once. RT64
+// presents early at the end of each task that drew to a framebuffer the screen shows, so such a frame went out twice,
+// the first time without the map, and at a display rate over the game's both were shown, a millisecond apart and then
+// nothing between them and the next frame: the map flickered and the picture stuttered (turok_frame_tasks).
 #include <atomic>
 #include <chrono>
 
@@ -40,6 +46,15 @@ namespace {
     int64_t window_slowest_us = 0; // of the window so far
     int window_frames = 0;
     int presenting_early = -1;     // 1 early, 0 Skip Buffering, -1 not picked yet
+    bool last_tasks_many = false;  // the last frame was sent as more than one task
+
+    void present(bool early) {
+        if ((int)early != presenting_early) {
+            recompui::renderer::set_presentation_mode(early ? ultramodern::renderer::PresentationMode::PresentEarly
+                                                            : ultramodern::renderer::PresentationMode::SkipBuffering);
+            presenting_early = early;
+        }
+    }
 
     // Blocks the calling game thread until the next turok_retrace.
     void wait_retrace(uint8_t* rdram, recomp_context* ctx) {
@@ -62,19 +77,23 @@ extern "C" void turok_retrace(uint8_t* rdram) {
 
 extern "C" void turok_start_frame_late(uint8_t* rdram, recomp_context* ctx, uint32_t per_frame, uint32_t since_swap) {
     int32_t per = MEM_W(0, (gpr)(int32_t)per_frame);
-    int early = per == 2;
-    if (early != presenting_early) {
-        recompui::renderer::set_presentation_mode(early ? ultramodern::renderer::PresentationMode::PresentEarly
-                                                        : ultramodern::renderer::PresentationMode::SkipBuffering);
-        presenting_early = early;
-    }
-    if (per == 2 && slowest_us < kSlowFrameUs) {
+    bool early = per == 2 && !last_tasks_many;
+    present(early);
+    if (early && slowest_us < kSlowFrameUs) {
         // A retrace or two at most: the count since the swap reaches 1 at the next one.
         for (int i = 0; i < 4 && MEM_W(0, (gpr)(int32_t)since_swap) < 1; i++) {
             wait_retrace(rdram, ctx);
         }
     }
     frame_start = Clock::now();
+}
+
+extern "C" void turok_frame_tasks(uint8_t*, uint32_t tasks) {
+    last_tasks_many = tasks > 1;
+    if (last_tasks_many) {
+        // At once, for this frame's first task: the render context takes the mode at its next display list.
+        present(false);
+    }
 }
 
 extern "C" void turok_frame_sent(uint8_t*) {
