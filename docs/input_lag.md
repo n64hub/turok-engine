@@ -167,10 +167,10 @@ last of each game's the build as released; one build's plays differ by up to 30 
 | Turok 1 v0.2.9 | 179 ms | 178 ms | 179 ms |
 | Turok 1, late start | 112 ms | 116 ms | 113 ms |
 | Turok 1, late start, the pad of the frame's start | 71.5 ms | 71 ms | 71 ms |
-| The same, as released | 92 ms | 86.5 ms | 88 ms |
+| The same, as released (v0.2.10) | 92 ms | 86.5 ms | 88 ms |
 | Turok 3 v0.2.8 | 137 ms | 133.5 ms | 137 ms |
 | Turok 3, late start | 83 ms | 81 ms | 82 ms |
-| The same, as released | 84 ms | 84 ms | 84 ms |
+| The same, as released (v0.2.9) | 84 ms | 84 ms | 84 ms |
 
 The trace build's Turok 1 plays answered 19 of their presses: one came in the host's stall, where the picture held
 still.
