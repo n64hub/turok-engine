@@ -79,8 +79,8 @@ builds.
 
 ### The map
 
-With its map open (func_00205574(0) true), the frame sends its tasks through func_00286B58: the world, and then the
-map's lines in a task of their own. RT64 presents early at the end of each task that drew to a framebuffer the screen
+The frame sends its tasks through func_00286B58: the world's, and, with the map open (the word at +0x128 of the frame
+set), then the map's lines in a task of their own. RT64 presents early at the end of each task that drew to a framebuffer the screen
 shows, so each frame went out twice, the first time without the map, and the game queued 60 presents a second for its
 30 frames. At 60 Hz RT64 skips a present whose next one is queued and showed the right one; at a display rate over
 that it showed both, a millisecond apart and then nothing between them and the next frame, and the map flickered over
@@ -88,10 +88,17 @@ a picture that stuttered. A frame dump of the Port of Adia at 120 Hz, turning wi
 showed 50 of its frames once, without the frames between, and 27 of its pictures without the map; v0.2.15, which
 presented with Skip Buffering, 13 and none.
 
-A frame sent as more than one task (`turok_frame_tasks`, from a hook on each of the frame's two ways of sending) is
-presented with Skip Buffering, and the next frame starts at once, as v0.2.15 paced every frame: a retrace more from a
-press to the picture while the map is open. The same dump: 30 presents queued a second, 5 frames shown once, none
-without the map.
+A frame sent as more than one task (`turok_frame_tasks`, given the frame's count by a hook in func_00286B58 before
+it sends the first) is presented with Skip Buffering, and the next frame starts at once, as v0.2.15 paced every
+frame: a retrace more from a press to the picture while the map is open. The same dump: 30 presents queued a second,
+1 frame shown once, none without the map; with the map closed, each frame shown four times, as before. A tally of the
+frames in that play had two tasks only while the map was open, and one on the title, in the menus, the cutscenes and
+on foot.
+
+func_00205574(0), which decides between func_00286B58 and a single task sent straight to the scheduler, isn't the
+map: it returns a pointer from a table, set nearly always. Counting every frame that went through func_00286B58 as two
+tasks (Turok 2 v0.2.18) presented every frame with Skip Buffering and lost the late start everywhere; the page then
+presented 225 frames a second uncapped, as v0.2.15's did, in place of 360.
 
 ### Measured
 

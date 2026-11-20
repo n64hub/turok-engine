@@ -94,7 +94,8 @@ Anything else the games share comes here when a change needs it in more than one
   code reads the stick to multiply it by `turok_stick_sensitivity()` (`docs/mouse_look.md`).
   A game whose frames are paced by the retraces hooks its frame's start with `turok_start_frame_late`, the end of its
   frame with `turok_frame_sent` and its retrace handler with `turok_retrace`, and presents early (`docs/input_lag.md`);
-  where a frame can be sent as more than one task, it hooks each way of sending with `turok_frame_tasks`.
+  where a frame can be sent as more than one task, it gives each frame's count of tasks to `turok_frame_tasks` before
+  the first is sent.
 
 ## Changing it
 
