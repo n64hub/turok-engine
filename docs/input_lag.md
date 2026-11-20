@@ -77,6 +77,22 @@ cuts through a figure at about 3.4 s came in one of v0.2.15's plays and three of
 presenting early. The repeated presents, 114 to 176 a play, differed more between one build's plays than between
 builds.
 
+### The map
+
+With its map open (func_00205574(0) true), the frame sends its tasks through func_00286B58: the world, and then the
+map's lines in a task of their own. RT64 presents early at the end of each task that drew to a framebuffer the screen
+shows, so each frame went out twice, the first time without the map, and the game queued 60 presents a second for its
+30 frames. At 60 Hz RT64 skips a present whose next one is queued and showed the right one; at a display rate over
+that it showed both, a millisecond apart and then nothing between them and the next frame, and the map flickered over
+a picture that stuttered. A frame dump of the Port of Adia at 120 Hz, turning with the map open for 9.5 s: v0.2.16
+showed 50 of its frames once, without the frames between, and 27 of its pictures without the map; v0.2.15, which
+presented with Skip Buffering, 13 and none.
+
+A frame sent as more than one task (`turok_frame_tasks`, from a hook on each of the frame's two ways of sending) is
+presented with Skip Buffering, and the next frame starts at once, as v0.2.15 paced every frame: a retrace more from a
+press to the picture while the map is open. The same dump: 30 presents queued a second, 5 frames shown once, none
+without the map.
+
 ### Measured
 
 By the picture on a Linux build, from a press to the window's first change: twenty presses at the Port of Adia, ten

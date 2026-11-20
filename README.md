@@ -53,7 +53,8 @@ says so.
   `turok_stick_sensitivity`).
 - `src/frame_pacing.cpp`: a frame started a retrace before the one it is swapped in at, instead of right after the swap
   before it, so it reads the pad and moves the world a retrace (17 ms) later and is shown at the same retrace
-  (`turok_start_frame_late`, `turok_frame_sent`, `turok_retrace`, `docs/input_lag.md`).
+  (`turok_start_frame_late`, `turok_frame_sent`, `turok_retrace`, `docs/input_lag.md`); a frame sent as more than one
+  task (Turok 2's with its map open) presents with Skip Buffering and the next starts at once (`turok_frame_tasks`).
 - `src/turok_engine.h`: all of the above, as a game calls it.
 - `tools/submodules.sh`: a game checkout's submodules, filled from a cache of mirrors every checkout on the machine
   shares, in place of `git submodule update --init --recursive`. The first checkout fills the cache; every one after
@@ -92,7 +93,8 @@ Anything else the games share comes here when a change needs it in more than one
   One with Stick Sensitivity passes its General tab to `turok::add_stick_sensitivity_option` and hooks where its look
   code reads the stick to multiply it by `turok_stick_sensitivity()` (`docs/mouse_look.md`).
   A game whose frames are paced by the retraces hooks its frame's start with `turok_start_frame_late`, the end of its
-  frame with `turok_frame_sent` and its retrace handler with `turok_retrace`, and presents early (`docs/input_lag.md`).
+  frame with `turok_frame_sent` and its retrace handler with `turok_retrace`, and presents early (`docs/input_lag.md`);
+  where a frame can be sent as more than one task, it hooks each way of sending with `turok_frame_tasks`.
 
 ## Changing it
 

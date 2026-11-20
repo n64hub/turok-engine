@@ -109,6 +109,9 @@ extern "C" {
     // present early while the game shows a frame for two retraces, and with Skip Buffering at any other count.
     void turok_start_frame_late(uint8_t* rdram, recomp_context* ctx, uint32_t per_frame, uint32_t since_swap);
     void turok_frame_sent(uint8_t* rdram);
+    // frame_pacing.cpp, from a game's hook where its frame sends its tasks: how many it sends. A frame of more than one
+    // task is presented with Skip Buffering, and the next starts at once.
+    void turok_frame_tasks(uint8_t* rdram, uint32_t tasks);
     void turok_retrace(uint8_t* rdram);
 }
 
