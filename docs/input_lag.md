@@ -64,8 +64,18 @@ frames between are all there (60 a second, as before).
 In the cutscenes, which the game runs at 15 frames a second (4 retraces a frame), presenting early costs the
 picture's evenness: RT64 shows a frame for a few retraces and then the frames it interpolates up to the next in a
 burst, so the cutscenes judder more than with Skip Buffering, and a limb close to the camera can flash for one of
-those frames. Presenting early only while the game runs at 30 frames a second would keep both modes' good sides; the
-runtime has no switch back to Skip Buffering yet.
+those frames. So `turok_start_frame_late` also picks the presentation mode at each frame's start: Present Early while
+the count is 2, Skip Buffering at any other (`recompui::renderer::set_presentation_mode()`, from
+`runtime-patches/RecompFrontend-2-presentation-mode-at-run-time.patch`, which RT64 takes at the next display list).
+The game's program makes its render context with Skip Buffering. The frame starts late only while the count is 2
+too, where RT64 presents early: at any other count it starts at once, as before the late start.
+
+Frame dumps of the Port of Adia's opening cutscene (95 to 112 s from the boot, 1280x720, four plays of each build)
+had a lone frame between the game's own, a limb close to the camera, at 11 s in two of v0.2.16's plays (Present Early
+throughout) and in none of v0.2.15's (Skip Buffering throughout) or this switch's. A dark frame where the camera
+cuts through a figure at about 3.4 s came in one of v0.2.15's plays and three of the switch's: it is older than
+presenting early. The repeated presents, 114 to 176 a play, differed more between one build's plays than between
+builds.
 
 ### Measured
 
@@ -83,3 +93,23 @@ that.
 | Order, Present Early | 141 ms | 132 ms | 139 ms |
 | Order, late start | 117 ms | 107 ms | 110 ms |
 | Order, late start, Present Early (three plays) | 102 ms | 101 ms | 101.5 ms |
+| Both, only at 30 frames a second (one play) | 98.5 ms | 94.5 ms | 96 ms |
+
+## Turok 1 and Turok 3
+
+Neither has the late start yet. By their code (read from the ROMs, not traced), both pace their frames as Turok 2
+does, and would take it the same way, waiting only while the count is 2:
+
+- Turok 3's frame code is nearly Turok 2's. The frame is func_00285424, which the game thread starts on the last
+  frame's task done message (func_002844A8); a frame is swapped in at its task's end (func_00282330) or by the
+  retrace handler (func_00281BAC). The count, at 0x80139390, is set from the last four frames as in Turok 2: 2 at
+  least, 4 in what looks like the cutscenes. The retraces since the swap are at 0x801661E0. A hook would go before
+  0x00285438 in func_00285424, the frame sent before 0x00285754, and `turok_retrace` before 0x00281E48, just after
+  the handler's pad read (func_00251604).
+- Turok 1 runs an older version of the same scheduler (three frame buffers, the same swap rule). The frame is
+  func_80009F6C, which starts on the last task's done message in play (the first two frames after a level or mode
+  change start on retraces), with the count at 0x80119884 (2 at least, 3 where the game asks for it) and the retraces
+  since the swap at 0x800F9CA0: a hook before 0x80009F7C, the frame sent before 0x8000AA58, and `turok_retrace`
+  before 0x8002BE60 in the retrace handler func_8002BBFC. That handler doesn't read the pads: the frame starts a read
+  itself (osContStartReadData, at 0x80009FA4) and takes its result after the frame, so each frame plays with the read
+  the frame before it started, a frame more from a press to the picture that the late start leaves as it is.

@@ -1,0 +1,57 @@
+diff --git a/recompui/include/recompui/renderer.h b/recompui/include/recompui/renderer.h
+index 0c88281..719f405 100644
+--- a/recompui/include/recompui/renderer.h
++++ b/recompui/include/recompui/renderer.h
+@@ -58,6 +58,10 @@ namespace recompui {
+         // doesn't wait for it. A game whose CPU reads a frame it has just drawn reads the one before then.
+         void set_render_to_ram_late(bool late);
+ 
++        // The presentation mode RT64 presents with from the next display list on, in place of the one the render context
++        // was made with, for a game that wants another mode in some of its scenes.
++        void set_presentation_mode(ultramodern::renderer::PresentationMode mode);
++
+         RT64::UserConfiguration::Antialiasing RT64MaxMSAA();
+         bool RT64SamplePositionsSupported();
+         bool RT64HighPrecisionFBEnabled();
+diff --git a/recompui/src/renderer/rt64_render_context.cpp b/recompui/src/renderer/rt64_render_context.cpp
+index ae85526..cb401cf 100644
+--- a/recompui/src/renderer/rt64_render_context.cpp
++++ b/recompui/src/renderer/rt64_render_context.cpp
+@@ -1,3 +1,4 @@
++#include <atomic>
+ #include <memory>
+ #include <cstring>
+ #include <variant>
+@@ -22,6 +23,9 @@ static bool sample_positions_supported = false;
+ static bool high_precision_fb_enabled = false;
+ static bool render_to_ram = true;
+ static bool render_to_ram_late = false;
++// The presentation mode set_presentation_mode() last asked for, -1 once a render context has taken it. The context takes
++// it at its next display list, on the thread that reads the mode.
++static std::atomic<int> wanted_presentation_mode{ -1 };
+ 
+ static uint8_t DMEM[0x1000];
+ static uint8_t IMEM[0x1000];
+@@ -367,6 +371,11 @@ renderer::RT64Context::~RT64Context() = default;
+ 
+ void renderer::RT64Context::send_dl(const OSTask* task) {
+     check_texture_pack_actions();
++    int wanted = wanted_presentation_mode.exchange(-1);
++    if (wanted >= 0) {
++        app->enhancementConfig.presentation.mode = to_rt64(static_cast<ultramodern::renderer::PresentationMode>(wanted));
++        app->updateEnhancementConfig();
++    }
+     app->state->rsp->reset();
+     app->interpreter->loadUCodeGBI(task->t.ucode & 0x3FFFFFF, task->t.ucode_data & 0x3FFFFFF, true);
+ #if defined(__EMSCRIPTEN__)
+@@ -545,6 +554,10 @@ std::unique_ptr<ultramodern::renderer::RendererContext> renderer::create_render_
+     return std::make_unique<renderer::RT64Context>(rdram, window_handle, presentation_mode, developer_mode);
+ }
+ 
++void renderer::set_presentation_mode(ultramodern::renderer::PresentationMode mode) {
++    wanted_presentation_mode = static_cast<int>(mode);
++}
++
+ void renderer::set_render_to_ram(bool enabled) {
+     render_to_ram = enabled;
+ }

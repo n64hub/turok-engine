@@ -46,6 +46,11 @@ applied a patch since edited, renamed or removed takes the new one without being
   where the GPU can't take 8 samples, as 4X already is where it can't take 4. RT64 draws 8X with its own sample
   positions, as it does 2X and 4X; upstream RecompFrontend leaves the choice out. 2X stays the default. On a web page
   WebGPU offers no MSAA RT64 can use, so the option stays greyed out there.
+- `RecompFrontend-2-presentation-mode-at-run-time.patch`: `recompui::renderer::set_presentation_mode()` changes the
+  presentation mode RT64 presents with (Console, Skip Buffering, Present Early) while the game runs, where upstream
+  takes it once, when the render context is made, and offers only `enable_instant_present()`, with no way back. The
+  render context takes the mode at its next display list, on the thread that hands RT64 its lists, as RT64 reads it
+  there. Turok 2 presents early only while it runs a frame per two retraces (`src/frame_pacing.cpp`).
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
 on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
