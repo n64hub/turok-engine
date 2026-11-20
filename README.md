@@ -23,8 +23,8 @@ says so.
 - `docs/rom_layout.md`: where the games' code is in the ROM, where it runs (the TLB mappings), and what that means for
   the symbols, the runtime and the web.
 - `docs/render_to_ram.md`: why the games run without RT64's copy of each frame into RDRAM, and how that was checked.
-- `docs/input_lag.md`: where the time from a press to the picture goes in the games' own frames, and what Turok 2's
-  order and pacing cost it.
+- `docs/input_lag.md`: where the time from a press to the picture goes in the games' own frames, and what each
+  game's order and pacing cost it.
 - `tools/gen_syms.py`: the function finder. It writes a game's `syms/` (the symbols N64Recomp reads) from the ROM
   and the game's `syms/layout.toml`, with no decompilation: spimdisasm's functions, jal targets, code pointers made
   in code and in data, stack-frame setups, the gaps between, with jump tables' case labels and the data fragments the

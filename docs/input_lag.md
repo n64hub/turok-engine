@@ -120,19 +120,57 @@ that.
 
 ## Turok 1 and Turok 3
 
-Neither has the late start yet. By their code (read from the ROMs, not traced), both pace their frames as Turok 2
-does, and would take it the same way, waiting only while the count is 2:
+Both pace their frames as Turok 2 does and take the late start the same way, waiting only while the count is 2. A
+frame that has started late presents early, and a frame at any other count presents with Skip Buffering, as in Turok 2:
 
 - Turok 3's frame code is nearly Turok 2's. The frame is func_00285424, which the game thread starts on the last
   frame's task done message (func_002844A8); a frame is swapped in at its task's end (func_00282330) or by the
-  retrace handler (func_00281BAC). The count, at 0x80139390, is set from the last four frames as in Turok 2: 2 at
-  least, 4 in what looks like the cutscenes. The retraces since the swap are at 0x801661E0. A hook would go before
-  0x00285438 in func_00285424, the frame sent before 0x00285754, and `turok_retrace` before 0x00281E48, just after
-  the handler's pad read (func_00251604).
+  retrace handler (func_00281BAC). The count, at 0x80139390 (copied into the task's +0x124), is set from the last
+  four frames as in Turok 2: 2 at least, 4 in the cutscenes. The retraces since the swap are at 0x801661E0. The
+  frame waits before 0x00285438 in func_00285424 and has sent its task before 0x00285754, and `turok_retrace` is
+  before 0x00281E48, just after the handler's pad read (func_00251604). Turok 2's way of sending with the map open
+  is there too (func_002849BC), but it sends one task, so it presents early like any other frame.
 - Turok 1 runs an older version of the same scheduler (three frame buffers, the same swap rule). The frame is
   func_80009F6C, which starts on the last task's done message in play (the first two frames after a level or mode
-  change start on retraces), with the count at 0x80119884 (2 at least, 3 where the game asks for it) and the retraces
-  since the swap at 0x800F9CA0: a hook before 0x80009F7C, the frame sent before 0x8000AA58, and `turok_retrace`
-  before 0x8002BE60 in the retrace handler func_8002BBFC. That handler doesn't read the pads: the frame starts a read
-  itself (osContStartReadData, at 0x80009FA4) and takes its result after the frame, so each frame plays with the read
-  the frame before it started, a frame more from a press to the picture that the late start leaves as it is.
+  change start on retraces). The count is at 0x8011987C (copied into the task's +0x184, which the swap rule reads;
+  2 at least, 3 where the game asks for it) and the retraces since the swap at 0x800F9CA0. The frame waits at
+  func_80009F6C's start and has sent its task before 0x8000AA58, and `turok_retrace` is before 0x8002BE60 in the
+  retrace handler func_8002BBFC. Its task goes out through func_80008060, with a second one after it when the
+  task's +0x188 is set, the shape of Turok 2's frame with its map open: `turok_frame_tasks` is hooked there.
+
+A trace of the frame's start, its task and each retrace, on the Linux build through the 20-press plays below: Turok
+1's frames at a count of 2 started 5636 times out of 5654 at the retrace before their swap and were swapped in at the
+next, every other retrace, and Turok 3's 6387 times out of 6395; the others each followed a level load or a stall of
+the host that held every game's retraces for up to 6 s. A frame took 0.1 ms (Turok 1) or 0.24 ms (Turok 3) from its
+start to its task, at the median, so the 8 ms that turns the wait off came only at boot.
+
+### Turok 1's pad
+
+Turok 1's retrace handler doesn't read the pads. The frame starts a read itself (osContStartReadData, at
+0x80009FA4, unless one is under way), and the game's thread takes its result (osContGetReadData into 0x801198E0, at
+0x800098CC) on the read's message, which it reads only once the frame has returned: each frame played with the pad
+as it was at the end of the frame before, and with the late start that is a retrace before the frame's own. The
+game's `us.toml` reads the pads into that buffer again at 0x80009FAC, after the frame's start and its read and before
+the frame takes from the buffer the pad it plays with (func_80010D40). The game's own take after the frame still
+comes, and the next frame reads the pads again over it.
+
+### Measured
+
+By the picture on the Linux build, as Turok 2's: twenty presses 7.0017 s apart, ten of the right stick and ten of a
+key (Turok 1 turns right with the stick and the Right key at its first level's start; Turok 3 looks up with the stick
+and the Up key in the Breach's first room, where the light's flicker swamps a turn), one play each, the window
+320x240, about 68 ms of each the harness's capture. The late start's rows are a build with the trace on, and the
+last of each game's the build as released; one build's plays differ by up to 30 ms, as Turok 2's did.
+
+| Build | Key | Stick | Both |
+|---|---|---|---|
+| Turok 1 v0.2.9 | 179 ms | 178 ms | 179 ms |
+| Turok 1, late start | 112 ms | 116 ms | 113 ms |
+| Turok 1, late start, the pad of the frame's start | 71.5 ms | 71 ms | 71 ms |
+| The same, as released (v0.2.10) | 92 ms | 86.5 ms | 88 ms |
+| Turok 3 v0.2.8 | 137 ms | 133.5 ms | 137 ms |
+| Turok 3, late start | 83 ms | 81 ms | 82 ms |
+| The same, as released (v0.2.9) | 84 ms | 84 ms | 84 ms |
+
+The trace build's Turok 1 plays answered 19 of their presses: one came in the host's stall, where the picture held
+still.
