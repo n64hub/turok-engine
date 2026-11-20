@@ -105,7 +105,8 @@ extern "C" {
     // frame_pacing.cpp, from a game's hooks: at its frame's start, before it reads the pad, the frame held until one
     // retrace is left before its swap (per_frame is the address of the game's retraces a frame is shown for, a word,
     // and since_swap of its count of retraces since the frame on the screen was swapped in); once the frame is sent
-    // (frame_sent); and at each retrace, in the game's retrace handler (retrace).
+    // (frame_sent); and at each retrace, in the game's retrace handler (retrace). The frame's start also sets RT64 to
+    // present early while the game shows a frame for two retraces, and with Skip Buffering at any other count.
     void turok_start_frame_late(uint8_t* rdram, recomp_context* ctx, uint32_t per_frame, uint32_t since_swap);
     void turok_frame_sent(uint8_t* rdram);
     void turok_retrace(uint8_t* rdram);
