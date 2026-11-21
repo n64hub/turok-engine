@@ -40,9 +40,9 @@ namespace turok {
     void on_audio_frequency(uint32_t frequency);
     void on_audio_queued();
 
-    // controller_pak.cpp: what each controller port (0-3) holds. A Controller Pak in port 1 unless a game sets its own.
-    enum class Accessory { None, ControllerPak, RumblePak };
-    void set_accessories(Accessory (*accessory)(int port));
+    // controller_pak.cpp: the ports holding a Controller Pak, bit 0 for port 1, as the GameEntry's
+    // controller_pak_ports (the runtime's pak) has them: the games save to one in port 1.
+    constexpr uint8_t controller_pak_ports = 0b0001;
 
     // widescreen.cpp: true while RT64 shows the picture wider than 4:3 (Expand). The game's display list head, the
     // address of the pointer its code writes commands through, before the game runs (or each frame, from a hook, for
@@ -76,7 +76,7 @@ extern "C" {
     void turok_set_clock_rate(uint8_t* rdram, uint32_t address);
     // audio.cpp: osAiGetStatus, full once about two retraces of audio are queued.
     void turok_ai_get_status(uint8_t* rdram, recomp_context* ctx);
-    // controller_pak.cpp: osMotorInit, answered as the port's accessory would.
+    // controller_pak.cpp: osMotorInit, answered as a Controller Pak in controller_pak_ports' ports, nothing in the others.
     void turok_motor_init(uint8_t* rdram, recomp_context* ctx);
     // widescreen.cpp, from a game's hooks: once its frame's display list has started (frame_begin) and before it's
     // sent (frame_end), and before and after its HUD (hud_begin, hud_end). Each does nothing outside Expand, but for a
