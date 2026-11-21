@@ -86,10 +86,10 @@ Anything else the games share comes here when a change needs it in more than one
   `.thread_create_callback = turok::on_thread_create`. Its on_init_callback calls `turok::set_fpu_mode`, then
   `turok::map_tlb_sections` with N64Recomp's section table and `turok::set_vm_base` with the first address its VM
   server hands out. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. It has
-  `.controller_pak_ports = turok::controller_pak_ports`, for the runtime's pak (N64Recomp-browser v0.255.0 on), and one that supports widescreen
-  calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera (`docs/widescreen.md`). A game
-  that runs without RT64's copy of each frame into RDRAM passes its Graphics tab to `turok::add_copy_frames_option`
-  (`docs/render_to_ram.md`). Its `get_input` hands the mouse's movement to `turok::add_mouse_motion`, and it hooks
+  `.controller_pak_ports = turok::controller_pak_ports`, for the runtime's pak (N64Recomp-browser v0.255.0 on), and
+  one that supports widescreen calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera
+  (`docs/widescreen.md`). A game that runs without RT64's copy of each frame into RDRAM passes its Graphics tab to
+  `turok::add_copy_frames_option` (`docs/render_to_ram.md`). Its `get_input` hands the mouse's movement to `turok::add_mouse_motion`, and it hooks
   its look code with `turok_spring_look` (`docs/mouse_look.md`).
   One with Stick Sensitivity passes its General tab to `turok::add_stick_sensitivity_option` and hooks where its look
   code reads the stick to multiply it by `turok_stick_sensitivity()` (`docs/mouse_look.md`).
