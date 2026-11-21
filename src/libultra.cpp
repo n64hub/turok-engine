@@ -27,8 +27,8 @@ extern "C" void osUnmapTLB_recomp(uint8_t*, recomp_context*) {
 }
 
 // The Controller Pak's internals, for the games' own copies of libultra's pak functions. The osPfs* entry points that
-// call them are the engine's (controller_pak.cpp), and the Rumble Pak's are the runtime's, so the calls never come;
-// were one to, it would find no pak.
+// call them are the runtime's (its pak.cpp) and the engine's (controller_pak.cpp), and the Rumble Pak's are the
+// runtime's, so the calls never come; were one to, it would find no pak.
 constexpr int32_t PFS_ERR_NOPACK = 1;
 
 extern "C" void __osPfsSelectBank_recomp(uint8_t*, recomp_context* ctx) {
