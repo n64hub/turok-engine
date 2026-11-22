@@ -43,10 +43,11 @@ namespace turok {
     // controller_pak.cpp: the ports holding a Controller Pak, bit 0 for port 1, as the GameEntry's
     // controller_pak_ports (the runtime's pak) has them: the games save to one in port 1.
     constexpr uint8_t controller_pak_ports = 0b0001;
-    // controller_pak.cpp: the GameEntry's controller_pak_banks, the pak in port 1 with Banks banks (32 KiB each, 123
-    // pages in the first and 127 in each after it) and 1 in the others. A game asks for enough for a save in each of
-    // the pak's 16 notes: Turok 2's save takes 90 pages (12 banks), Turok 1's and Turok 3's 16 (3 banks). The runtime
-    // grows an older, smaller pak to it at the game's first osPfsInitPak and keeps its saves.
+    // controller_pak.cpp: the GameEntry's controller_pak_banks, the pak in port 1 with Banks banks (32 KiB each) and 1
+    // in the others. A pak of n banks holds 128 - 3 - 2n pages in its first bank (its id, two inode pages per bank and
+    // the notes' directory take the rest) and 127 in each after it: 123 for one bank, 373 for three. A game asks for
+    // enough for a save in each of the pak's 16 notes: Turok 1's and Turok 3's saves take 16 pages (3 banks). The
+    // runtime grows an older, smaller pak to it at the game's first osPfsInitPak and keeps its saves.
     template <int Banks> int controller_pak_banks(int port) { return port == 0 ? Banks : 1; }
 
     // widescreen.cpp: true while RT64 shows the picture wider than 4:3 (Expand). The game's display list head, the
