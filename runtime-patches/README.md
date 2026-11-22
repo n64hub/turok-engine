@@ -27,16 +27,15 @@ applied a patch since edited, renamed or removed takes the new one without being
   rectangle's scissor, are fractions of the whole window rather than of the width HUD Placement gives the HUD (a draw
   call's `rectWindowOrigins`): a quarter's crosshair stays at the quarter's centre at 21:9.
 - `rt64-4-l3dex-reads-as-f3dex.patch`: RT64 reads display lists for L3DEX 1.x, F3DEX's line microcode, with F3DEX's
-  commands, and takes its G_LINE3D (0xB5, F3DEX's G_QUAD) as drawing nothing, as it already does for L3DEX2's. It knew
-  L3DEX 1.x by its hash, but as an unknown microcode, which gave it only the RDP's commands: a list that loaded it never
-  reached its end, a branch or the load back to F3DEX, and the interpreter ran on through RDRAM until it faulted. Turok
-  1 draws its map with L3DEX 1.00, and crashed a few seconds after L opened the map. The next patch draws the lines.
-- `rt64-5-l3dex-lines-drawn-as-quads.patch`: RT64 draws the line microcodes' G_LINE3D (gSPLineW3D: L3DEX 1.x's 0xB5,
-  L3DEX2's 0x08), which it took as drawing nothing. A line is a quad along it on the screen, 1.5 pixels wide and half a
-  pixel wider for each step of its width. RT64 transforms vertices on the GPU, so the quad's corners are copies of the
-  line's two ends that RSPModifyCS, which already moves G_MW_POINTS's vertices on the screen, moves off the line by half
-  its width after the transform: the lines move with the camera, frame interpolation and widescreen as triangles do.
-  Turok 1 draws its map (L) with L3DEX 1.00; Turok 2, 3 and Rage Wars carry L3DEX2.
+  commands, and draws its G_LINE3D (0xB5, F3DEX's G_QUAD; gSPLineW3D, the ends and width in the second word) as
+  N64Recomp-browser's `RT64_DRAW_LINES` draws L3DEX2's, or not at all without it. It knew L3DEX 1.x by its hash, but as
+  an unknown microcode, which gave it only the RDP's commands: a list that loaded it never reached its end, a branch or
+  the load back to F3DEX, and the interpreter ran on through RDRAM until it faulted. Turok 1 draws its map with L3DEX
+  1.00, and crashed a few seconds after L opened the map. Each game turns `RT64_DRAW_LINES` on (its CMakeLists.txt):
+  a line is a quad along it on the screen, 1.5 pixels wide and half a pixel wider for each step of its width, moved
+  off the line on the GPU after the transform, so it moves with the camera, frame interpolation and widescreen as
+  triangles do. Turok 1 draws its map (L) with L3DEX 1.00; Turok 2, 3 and Rage Wars carry L3DEX2. Until
+  N64Recomp-browser v0.266.0 the lines were this repo's own patch, rt64-5, which `RT64_DRAW_LINES` replaces.
 - `rt64-6-split-screen-views-judged-by-their-own-scissors.patch`: on the web page (N64Recomp-browser's
   `RT64_PARTIAL_SCREEN_PAIRS`, always on with Emscripten) a split screen's views are judged by their own scissors, as
   on the desktop, in a task that drew a HUD in a view (gEXSetAutoAnchor's mode 2, a draw call's `rectInView`). By the
@@ -53,4 +52,5 @@ applied a patch since edited, renamed or removed takes the new one without being
   there. Turok 2 presents early only while it runs a frame per two retraces (`src/frame_pacing.cpp`).
 
 A patch is made on the commit the game's submodule pins, which is the upstream commit N64Recomp-browser's patches are
-on. When N64Recomp-browser moves, check each still applies (`git apply --check` in that folder after its own patches).
+on, after those patches: these are made for N64Recomp-browser v0.266.0 on. When N64Recomp-browser moves, check each
+still applies (`git apply --check` in that folder after its own patches).

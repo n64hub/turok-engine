@@ -1,4 +1,5 @@
 diff --git a/src/gbi/rt64_gbi.cpp b/src/gbi/rt64_gbi.cpp
+index 199bb72..ab69dbb 100644
 --- a/src/gbi/rt64_gbi.cpp
 +++ b/src/gbi/rt64_gbi.cpp
 @@ -145,10 +145,10 @@ namespace RT64 {
@@ -27,6 +28,7 @@ diff --git a/src/gbi/rt64_gbi.cpp b/src/gbi/rt64_gbi.cpp
                  GBI_L3DEX2::setup(&gbi);
                  break;
 diff --git a/src/gbi/rt64_gbi.h b/src/gbi/rt64_gbi.h
+index 69c35d2..a7e9e78 100644
 --- a/src/gbi/rt64_gbi.h
 +++ b/src/gbi/rt64_gbi.h
 @@ -27,6 +27,7 @@ namespace RT64 {
@@ -38,21 +40,28 @@ diff --git a/src/gbi/rt64_gbi.h b/src/gbi/rt64_gbi.h
          Count
      };
 diff --git a/src/gbi/rt64_gbi_l3dex2.cpp b/src/gbi/rt64_gbi_l3dex2.cpp
+index 3c30e2a..4c57dd7 100644
 --- a/src/gbi/rt64_gbi_l3dex2.cpp
 +++ b/src/gbi/rt64_gbi_l3dex2.cpp
-@@ -4,9 +4,24 @@
+@@ -4,9 +4,30 @@
  
  #include "rt64_gbi_l3dex2.h"
  
++#include "hle/rt64_interpreter.h"
++
 +#include "rt64_gbi_f3dex.h"
  #include "rt64_gbi_f3dex2.h"
  
  namespace RT64 {
 +    namespace GBI_L3DEX {
 +        void line3D(State *state, DisplayList **dl) {
-+            // Lines aren't drawn yet, as with L3DEX2. What matters is that the rest of the list is read as the
-+            // microcode reads it: as an unknown microcode only the RDP's commands were, so a list switching to it
-+            // never found its end and the interpreter ran on through RDRAM until it faulted.
++            // gSPLineW3D: the two ends' indices, doubled, and the width, in the second word, where L3DEX2's has them in
++            // the first. Drawn as RT64_DRAW_LINES draws L3DEX2's; without it, nothing. Either way the rest of the list is
++            // read as the microcode reads it: as an unknown microcode only the RDP's commands were, so a list switching
++            // to it never found its end and the interpreter ran on through RDRAM until it faulted.
++#       if RT64_DRAW_LINES
++            state->rsp->drawLine((*dl)->p1(17, 7), (*dl)->p1(9, 7), (*dl)->p1(0, 8));
++#       endif
 +        }
 +
 +        void setup(GBI *gbi) {
@@ -64,8 +73,16 @@ diff --git a/src/gbi/rt64_gbi_l3dex2.cpp b/src/gbi/rt64_gbi_l3dex2.cpp
 +
      namespace GBI_L3DEX2 {
          void line3D(State *state, DisplayList **dl) {
-             assert(false);
+ #       if RT64_DRAW_LINES
+@@ -22,4 +43,4 @@ namespace RT64 {
+             gbi->map[L3DEX2_G_LINE3D] = &line3D;
+         }
+     }
+-};
+\ No newline at end of file
++};
 diff --git a/src/gbi/rt64_gbi_l3dex2.h b/src/gbi/rt64_gbi_l3dex2.h
+index 816217a..152f94d 100644
 --- a/src/gbi/rt64_gbi_l3dex2.h
 +++ b/src/gbi/rt64_gbi_l3dex2.h
 @@ -6,9 +6,17 @@

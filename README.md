@@ -69,7 +69,8 @@ Anything else the games share comes here when a change needs it in more than one
 - `CMakeLists.txt` compiles each of `lib/turok-engine/src/`'s `.cpp` files into the game (it lists them, so a new one
   is added there when the pin moves onto it), with `lib/turok-engine/src` on its include
   path, and its patch step applies `lib/turok-engine/runtime-patches/` after N64Recomp-browser's patches and before
-  the game's own.
+  the game's own. It sets `RT64_DRAW_LINES` on before it adds `lib/rt64`, for the line microcodes' lines
+  (`runtime-patches/README.md`, rt64-4).
 - `syms/layout.toml` says where the game's code segments are in the ROM and where they run (`tools/gen_syms.py`'s
   header), and `syms/names.toml` names the functions the game knows, among them the natives below. Running
   `python3 lib/turok-engine/tools/gen_syms.py` from the game's root writes `syms/<game>.syms.toml`.
