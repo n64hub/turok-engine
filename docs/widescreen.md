@@ -54,6 +54,10 @@ read back from RDRAM instead, at 1x, a row off, and never wider than 4:3, whatev
   stays as two black lines inside the widened picture unless it is taken out. In the opening scene each piece before
   the letterbox is empty; in the Breach's first in-level cutscene (the tentacles at the window) the first holds
   commands of its own, so the G_ENDDL ending it doesn't follow its branch, and only following the branch gets past it.
+  Every walk of the frame's list (the scissors, the colour image, the border's rectangles) follows such a branch too,
+  so what a list branches over is never read as commands: Turok 2's weapon, at a Field of View other than 100%, puts a
+  matrix there, and a word of it read as a G_SETCIMG gave the HUD a garbage colour image, a new framebuffer for RT64
+  each frame, until video memory ran out and the game crashed.
 - Also at the end of the frame, and before the HUD: the screen's last column and row. Turok 2's full-screen scissor is
   (0,0)-(479,359) on a 480x360 screen (its last pixel, where the RDP wants its size), so it never draws column 479 or
   row 359. At 4:3 they are black beside the window's black bars, but RT64 scales the scissor with the widened screen,
