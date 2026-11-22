@@ -44,6 +44,18 @@ namespace {
         return { (uint32_t)MEM_W(0, (gpr)(int32_t)address), (uint32_t)MEM_W(4, (gpr)(int32_t)address) };
     }
 
+    // The command the RSP runs after the one at a, in a list read up to limit: a G_DL that doesn't push, forward and no
+    // further than limit, goes on at its target, and what it branches over is never read as commands. Turok 2's weapon
+    // puts a matrix there at a Field of View other than 100%, whose words read as a G_SETCIMG (0xFF) took a garbage
+    // colour image into the HUD's, a new framebuffer for RT64 each frame, until video memory ran out.
+    uint32_t next_command(uint8_t* rdram, uint32_t a, uint32_t limit) {
+        Command c = read(rdram, a);
+        if ((c.w0 >> 24) == dl_opcode && ((c.w0 >> 16) & 0xFF) == 1 && c.w1 > a && c.w1 <= limit && (c.w1 & 7) == 0) {
+            return c.w1;
+        }
+        return a + 8;
+    }
+
     // Commands written at the game's head, which then moves past them.
     struct Writer {
         uint8_t* rdram;
@@ -173,14 +185,8 @@ namespace {
             return false;
         }
         uint32_t limit = in_frame ? head : frame_start + kMaxFrameBytes;
-        for (uint32_t a = frame_start; a < limit; a += 8) {
-            Command c = read(rdram, a);
-            uint32_t op = c.w0 >> 24;
-            if (op == dl_opcode && ((c.w0 >> 16) & 0xFF) == 1 && c.w1 > a && c.w1 < limit && (c.w1 & 7) == 0) {
-                a = c.w1 - 8; // the list goes on at the target
-                continue;
-            }
-            if (op == end_opcode) {
+        for (uint32_t a = frame_start; a < limit; a = next_command(rdram, a, limit)) {
+            if ((read(rdram, a).w0 >> 24) == end_opcode) {
                 *end = a + 8;
                 return true;
             }
@@ -197,7 +203,7 @@ namespace {
     bool screen_scissor(uint8_t* rdram, uint32_t end, uint32_t* lrx, uint32_t* lry) {
         *lrx = 0;
         *lry = 0;
-        for (uint32_t a = frame_start; a < end; a += 8) {
+        for (uint32_t a = frame_start; a < end; a = next_command(rdram, a, end)) {
             Command c = read(rdram, a);
             if ((c.w0 >> 24) != 0xED) {
                 continue;
@@ -219,13 +225,13 @@ namespace {
     // it first) goes with that one. Opened once, a scissor no longer matches, so a second pass leaves it alone.
     void open_scissor_last_pixel(uint8_t* rdram, uint32_t end) {
         uint32_t width = 0; // the colour image's, in 10.2
-        for (uint32_t a = frame_start; a < end && width == 0; a += 8) {
+        for (uint32_t a = frame_start; a < end && width == 0; a = next_command(rdram, a, end)) {
             Command c = read(rdram, a);
             if ((c.w0 >> 24) == 0xFF) {
                 width = ((c.w0 & 0xFFF) + 1) * 4;
             }
         }
-        for (uint32_t a = frame_start; a < end; a += 8) {
+        for (uint32_t a = frame_start; a < end; a = next_command(rdram, a, end)) {
             Command c = read(rdram, a);
             uint32_t op = c.w0 >> 24;
             if (op == 0xFF) { // G_SETCIMG
@@ -372,7 +378,7 @@ extern "C" void turok_frame_end(uint8_t* rdram) {
         return;
     }
     constexpr uint32_t kEdge = 4 * 4; // 10.2
-    for (uint32_t a = frame_start; a < end; a += 8) {
+    for (uint32_t a = frame_start; a < end; a = next_command(rdram, a, end)) {
         Command c = read(rdram, a);
         if ((c.w0 >> 24) != 0xF6) { // G_FILLRECT
             continue;
@@ -416,7 +422,7 @@ extern "C" void turok_hud_begin(uint8_t* rdram) {
     }
     uint32_t view_w0 = 0, view_w1 = 0, width = 0; // the last G_SETSCISSOR, and the colour image's width, in 10.2
     Command cimg = {};                             // the last G_SETCIMG
-    for (uint32_t a = frame_start; a < head; a += 8) {
+    for (uint32_t a = frame_start; a < head; a = next_command(rdram, a, head)) {
         Command c = read(rdram, a);
         if ((c.w0 >> 24) == 0xED) {
             view_w0 = c.w0;
