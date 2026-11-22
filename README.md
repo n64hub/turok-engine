@@ -39,8 +39,8 @@ says so.
   queued (`turok_ai_get_status`). With RSPRecomp's audio microcode, which a game recompiles from its own ROM, that is
   the audio setup.
 - `src/controller_pak.cpp`: which ports hold a Controller Pak (`turok::controller_pak_ports`, port 1), as osPfsIsPlug
-  and the games' osMotorInit probe (`turok_motor_init`) answer it. The pak itself is the runtime's, saved to a file per
-  port.
+  and the games' osMotorInit probe (`turok_motor_init`) answer it, and how big the pak is (`turok::controller_pak_banks`,
+  room for a save in each of its 16 notes). The pak itself is the runtime's, saved to a file per port.
 - `src/libultra.cpp`: the libultra functions the games link that N64Recomp leaves out and the runtime lacks (the
   thread queues, the pak's raw reads, osUnmapTLB).
 - `src/widescreen.cpp`: what RT64's widescreen (Expand) needs from the game's display list: the HUD anchored to the
@@ -87,6 +87,7 @@ Anything else the games share comes here when a change needs it in more than one
   `turok::map_tlb_sections` with N64Recomp's section table and `turok::set_vm_base` with the first address its VM
   server hands out. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. It has
   `.controller_pak_ports = turok::controller_pak_ports`, for the runtime's pak (N64Recomp-browser v0.255.0 on), and
+  `.controller_pak_banks = turok::controller_pak_banks<N>`, the banks 16 of its saves take (v0.259.0 on), and
   one that supports widescreen calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera
   (`docs/widescreen.md`). A game that runs without RT64's copy of each frame into RDRAM passes its Graphics tab to
   `turok::add_copy_frames_option` (`docs/render_to_ram.md`). Its `get_input` hands the mouse's movement to `turok::add_mouse_motion`, and it hooks
