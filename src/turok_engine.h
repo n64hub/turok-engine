@@ -49,6 +49,11 @@ namespace turok {
     // enough for a save in each of the pak's 16 notes: Turok 1's and Turok 3's saves take 16 pages (3 banks). The
     // runtime grows an older, smaller pak to it at the game's first osPfsInitPak and keeps its saves.
     template <int Banks> int controller_pak_banks(int port) { return port == 0 ? Banks : 1; }
+    // controller_pak.cpp: where the game's rumble code keeps its OSPfs for each port, port 1's at first and the next
+    // port's stride past it, which turok_motor_init answers as the runtime's osMotorInit does: a Rumble Pak in a port
+    // whose connected_pak is one. Each other OSPfs, the save screens', finds the Controller Pak. From on_init_callback;
+    // with none set, every OSPfs finds the Controller Pak and the game never drives the motor.
+    void set_rumble_pfs(uint32_t first, uint32_t stride);
 
     // widescreen.cpp: true while RT64 shows the picture wider than 4:3 (Expand). The game's display list head, the
     // address of the pointer its code writes commands through, before the game runs (or each frame, from a hook, for
@@ -82,7 +87,8 @@ extern "C" {
     void turok_set_clock_rate(uint8_t* rdram, uint32_t address);
     // audio.cpp: osAiGetStatus, full once about two retraces of audio are queued.
     void turok_ai_get_status(uint8_t* rdram, recomp_context* ctx);
-    // controller_pak.cpp: osMotorInit, answered as a Controller Pak in controller_pak_ports' ports, nothing in the others.
+    // controller_pak.cpp: osMotorInit, answered as a Controller Pak in controller_pak_ports' ports and nothing in the
+    // others, but as the runtime's for the rumble code's OSPfs (turok::set_rumble_pfs).
     void turok_motor_init(uint8_t* rdram, recomp_context* ctx);
     // widescreen.cpp, from a game's hooks: once its frame's display list has started (frame_begin) and before it's
     // sent (frame_end), and before and after its HUD (hud_begin, hud_end). Each does nothing outside Expand, but for a
