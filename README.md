@@ -40,7 +40,8 @@ says so.
   the audio setup.
 - `src/controller_pak.cpp`: which ports hold a Controller Pak (`turok::controller_pak_ports`, port 1), as osPfsIsPlug
   and the games' osMotorInit probe (`turok_motor_init`) answer it, and how big the pak is (`turok::controller_pak_banks`,
-  room for a save in each of its 16 notes). The pak itself is the runtime's, saved to a file per port.
+  room for a save in each of its 16 notes). The pak itself is the runtime's, saved to a file per port. The same port
+  holds a Rumble Pak for the game's rumble code (`turok::set_rumble_pfs`), whose probe has an OSPfs of its own.
 - `src/libultra.cpp`: the libultra functions the games link that N64Recomp leaves out and the runtime lacks (the
   thread queues, the pak's raw reads, osUnmapTLB).
 - `src/widescreen.cpp`: what RT64's widescreen (Expand) needs from the game's display list: the HUD anchored to the
@@ -86,7 +87,8 @@ Anything else the games share comes here when a change needs it in more than one
 - The game's GameEntry has `.entrypoint_address = turok::boot_load_address` and
   `.thread_create_callback = turok::on_thread_create`. Its on_init_callback calls `turok::set_fpu_mode`, then
   `turok::map_tlb_sections` with N64Recomp's section table and `turok::set_vm_base` with the first address its VM
-  server hands out. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. It has
+  server hands out, and in a game with rumble (Turok 2, Turok 3) `turok::set_rumble_pfs` with where its rumble code
+  keeps each port's OSPfs, so that code finds a Rumble Pak in port 1. Its audio callbacks call `turok::on_audio_frequency` and `turok::on_audio_queued`. It has
   `.controller_pak_ports = turok::controller_pak_ports`, for the runtime's pak (N64Recomp-browser v0.255.0 on), and
   `.controller_pak_banks = turok::controller_pak_banks<N>`, the banks 16 of its saves take (v0.259.0 on), and
   one that supports widescreen calls `turok::set_display_list_head` and hooks its frame, its HUD and its camera
