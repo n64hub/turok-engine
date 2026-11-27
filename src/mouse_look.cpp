@@ -40,20 +40,49 @@ namespace {
     // mouse held the view at is let go.
     constexpr auto kAway = std::chrono::milliseconds(500);
 
-    // How fast the stick tilts the look up or down, pushed all the way: in radians a second, about 140 degrees, two thirds of how fast Turok 2 turns with it (0.132 radians a frame at 30 a second).
-    constexpr float kStickPitchRate = 2.4f;
-    // The longest a frame of the look counts for at that rate: a hitch doesn't throw the view up or down.
+    // How fast the stick tilts a held angle (the look up or down, or a head turned on a ladder), pushed all the way:
+    // in radians a second, about 140 degrees, two thirds of how fast Turok 2 turns with it (0.132 radians a frame at
+    // 30 a second).
+    constexpr float kStickRate = 2.4f;
+    // The longest a frame of the look counts for at that rate: a hitch doesn't throw the view.
     constexpr float kLongestFrame = 0.1f;
 
     const std::string stick_sensitivity_option = "stick_sensitivity";
     // The setting, as a factor: read from the config at each change, so the look reads a float a frame.
     std::atomic<float> stick_sensitivity{ 1.0f };
 
+    // An angle the game springs back to 0 when the stick is let go, held where the stick and the mouse leave it, and
+    // when its hook last ran. Each is the game thread's alone.
+    struct Spring {
+        float held = 0.0f;
+        Clock::time_point last{};
+    };
+    Spring pitch_spring;   // the look up and down, on foot and on Turok 3's ladders alike
+    Spring turn_spring;    // the head turned apart from the body, on Turok 3's ladders
+
     std::mutex mutex;
-    float pending_x = 0.0f;    // counts to the right since the look last ran
+    float pending_x = 0.0f;    // counts to the right since the look last took them
     float pending_y = 0.0f;    // counts down
     Clock::time_point last_look{};
-    float held_pitch = 0.0f;   // where the stick and the mouse hold the pitch, which the game would spring back level
+
+    // The mouse's movement on the axes asked for (nullptr for the other, left for the hook that takes it later in the
+    // same frame), and whether the spring's hook has been away and for how long it hasn't run.
+    void take(Spring& spring, float* dx, float* dy, bool& away, float& seconds) {
+        std::lock_guard lock{ mutex };
+        Clock::time_point now = Clock::now();
+        away = now - spring.last > kAway;
+        seconds = away ? 0.0f : std::min(std::chrono::duration<float>(now - spring.last).count(), kLongestFrame);
+        spring.last = now;
+        last_look = now;
+        if (dx != nullptr) {
+            *dx = pending_x;
+            pending_x = 0.0f;
+        }
+        if (dy != nullptr) {
+            *dy = pending_y;
+            pending_y = 0.0f;
+        }
+    }
 
     float read_float(uint8_t* rdram, uint32_t address) {
         uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)address);
@@ -115,47 +144,56 @@ extern "C" float turok_stick_sensitivity(void) {
     return stick_sensitivity.load(std::memory_order_relaxed);
 }
 
+namespace {
+    // One frame of a held angle: the mouse's turn (already in the angle's units) and the stick's tilt, read from the
+    // target the game is about to ease the angle towards, which it makes of the stick's deflection and which springs
+    // back to 0 when the stick is let go. That target, as a share of the way to the limit it points at, is how fast
+    // the stick tilts the angle instead: held is the whole target, the stick's tilt and the mouse's together, within
+    // the game's own limits, and the angle moves with it, at once, and stays where they leave it. It's let go when
+    // the game itself set the angle to 0 (a respawn, a level's start, the head turned back into the body as the
+    // player leaves a ladder) or the player was away.
+    void hold(uint8_t* rdram, Spring& spring, bool away, float seconds, uint32_t address, float scale, float turn,
+        gpr* target_reg, float min, float max) {
+        float angle = read_float(rdram, address);
+        if (away || (angle == 0.0f && spring.held != 0.0f)) {
+            spring.held = 0.0f;
+        }
+        float target = register_float(target_reg);
+        float tilt = target > 0.0f ? target / max : target < 0.0f ? target / -min : 0.0f;
+        turn += tilt * kStickRate * scale * seconds;
+        float held = std::clamp(spring.held + turn, min, max);
+        float moved = held - spring.held;
+        spring.held = held;
+        if (moved != 0.0f) {
+            write_float(rdram, address, std::clamp(angle + moved, min, max));
+        }
+        set_register_float(target_reg, spring.held);
+    }
+}
+
 extern "C" void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
     gpr* pitch_target, float pitch_min, float pitch_max) {
-    float dx, dy;
+    float dx, dy, seconds;
     bool away;
-    float seconds;
-    {
-        std::lock_guard lock{ mutex };
-        Clock::time_point now = Clock::now();
-        away = now - last_look > kAway;
-        seconds = away ? 0.0f : std::min(std::chrono::duration<float>(now - last_look).count(), kLongestFrame);
-        last_look = now;
-        dx = pending_x;
-        dy = pending_y;
-        pending_x = 0.0f;
-        pending_y = 0.0f;
-    }
-
+    take(pitch_spring, &dx, &dy, away, seconds);
     if (dx != 0.0f) {
         write_float(rdram, yaw, read_float(rdram, yaw) + dx * kRadiansPerCount * yaw_scale);
     }
-
     // The mouse moved up (dy below 0) looks up.
-    float turn = -dy * kRadiansPerCount * pitch_scale;
-    float angle = read_float(rdram, pitch);
+    hold(rdram, pitch_spring, away, seconds, pitch, pitch_scale, -dy * kRadiansPerCount * pitch_scale, pitch_target,
+        pitch_min, pitch_max);
+}
 
-    // The game eases the pitch towards a target it makes of the stick, which springs back level when the stick is let
-    // go. That target, as a share of the way to the limit it points at, is how fast the stick tilts the view instead:
-    // held_pitch is the whole target, the stick's tilt and the mouse's together, within the game's own limits, and the
-    // pitch moves with it, at once, and stays where they leave it. It's let go when the game itself set the pitch level
-    // (a respawn, a level's start) or the player was away.
-    if (away || (angle == 0.0f && held_pitch != 0.0f)) {
-        held_pitch = 0.0f;
-    }
-    float target = register_float(pitch_target);
-    float tilt = target > 0.0f ? target / pitch_max : target < 0.0f ? target / -pitch_min : 0.0f;
-    turn += tilt * kStickPitchRate * pitch_scale * seconds;
-    float held = std::clamp(held_pitch + turn, pitch_min, pitch_max);
-    float moved = held - held_pitch;
-    held_pitch = held;
-    if (moved != 0.0f) {
-        write_float(rdram, pitch, std::clamp(angle + moved, pitch_min, pitch_max));
-    }
-    set_register_float(pitch_target, held_pitch);
+extern "C" void turok_spring_turn(uint8_t* rdram, uint32_t angle, float scale, gpr* target, float min, float max) {
+    float dx, seconds;
+    bool away;
+    take(turn_spring, &dx, nullptr, away, seconds);
+    hold(rdram, turn_spring, away, seconds, angle, scale, dx * kRadiansPerCount * scale, target, min, max);
+}
+
+extern "C" void turok_spring_pitch(uint8_t* rdram, uint32_t pitch, float scale, gpr* target, float min, float max) {
+    float dy, seconds;
+    bool away;
+    take(pitch_spring, nullptr, &dy, away, seconds);
+    hold(rdram, pitch_spring, away, seconds, pitch, scale, -dy * kRadiansPerCount * scale, target, min, max);
 }

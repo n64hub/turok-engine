@@ -70,8 +70,24 @@ stick apart from the look code, so neither changes.
 | Turok 1 | func_80052B1C | 0x80053688 | *(sp + 0xB4) + 0x64 | s0 + 0x70 | s0 + 0x68; limits -1.3614, pi/2 |
 
 These are the on-foot looks. Swimming and the vehicles have their own, which aren't hooked, so the mouse does not
-turn the view there. Turok 1 has already read its pitch into f12 when the hook runs, so its hook reads it again after
+turn the view there. Turok 3's ladder look is hooked too (below). Turok 1 has already read its pitch into f12 when the hook runs, so its hook reads it again after
 the call.
 
 A count turns the view 0.12 degrees at 100% Mouse Sensitivity, so the default of 50% turns a full circle in 6000
 counts.
+
+## Turok 3's ladders
+
+On a ladder Turok 3 doesn't turn the body: its look there (func_002D26F4) eases a head turn at the struct's +0xDD4,
+which the camera adds to the body's yaw, towards the stick's left and right times 200 degrees (a quarter of what is left at a
+step), and the pitch towards its up and down within 90 degrees (half), and both spring back once the stick is
+let go. Leaving the ladder turns the body by the head's turn and sets the turn back to 0. Its two eases are hooked
+apart, in the same frame, before the calls that make them: `turok_spring_turn` holds the head's turn as
+`turok_spring_look` holds the pitch, with the mouse's left and right movement, and `turok_spring_pitch` holds the
+pitch with its up and down. The pitch is the one held on foot, so the view keeps its angle getting on and off a
+ladder.
+
+| Game | Look code | Hook before | Angle | Target | Limits |
+|---|---|---|---|---|---|
+| Turok 3 | func_002D26F4 | 0x002D280C | s0 + 0xDD4 (turn) | a1 | -3.4907, 3.4907 |
+| Turok 3 | func_002D26F4 | 0x002D286C | s0 + 0xDD0 (pitch) | a1 | -pi/2, pi/2 |

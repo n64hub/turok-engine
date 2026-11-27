@@ -111,6 +111,13 @@ extern "C" {
     // deflection tilts the view up or down at a rate instead, and the view stays where the stick and the mouse leave it.
     void turok_spring_look(uint8_t* rdram, uint32_t yaw, float yaw_scale, uint32_t pitch, float pitch_scale,
         gpr* pitch_target, float pitch_min, float pitch_max);
+    // mouse_look.cpp, from a game's hooks in a look that eases two angles towards the stick's deflection, each with a
+    // call of its own, in the same frame: turok_spring_look's held pitch, and the same for an angle the mouse's left
+    // and right movement turns (at angle, radians times scale, growing to the right, within [min, max]), such as a
+    // head turned apart from the body. target is the register holding the float target the game is about to ease that
+    // angle towards. Each takes its own axis of the mouse's movement, and the pitch held is turok_spring_look's own.
+    void turok_spring_turn(uint8_t* rdram, uint32_t angle, float scale, gpr* target, float min, float max);
+    void turok_spring_pitch(uint8_t* rdram, uint32_t pitch, float scale, gpr* target, float min, float max);
     // mouse_look.cpp, from a game's hooks in its look code where it reads the stick's deflection to turn or look by:
     // what the deflection is multiplied by, the Stick Sensitivity setting (1 at 100%, and 1 in a game without it).
     float turok_stick_sensitivity(void);
