@@ -45,7 +45,8 @@ says so.
 - `src/libultra.cpp`: the libultra functions the games link that N64Recomp leaves out and the runtime lacks (the
   thread queues, the pak's raw reads, osUnmapTLB).
 - `src/widescreen.cpp`: what RT64's widescreen (Expand) needs from the game's display list: the HUD anchored to the
-  window's sides, the border at the old 4:3 edges taken out and the camera's culling widened (`docs/widescreen.md`).
+  window's sides, the border at the old 4:3 edges taken out and the camera's culling widened, and, while RT64
+  interpolates, the camera's cuts and the player's weapon (`docs/widescreen.md`).
 - `src/render_to_ram.cpp`: RT64's copy of each frame back into RDRAM turned off, which none of the games needs, and
   the Graphics tab's Copy Frames to RAM option that turns it back on (`docs/render_to_ram.md`).
 - `src/mouse_look.cpp`: the mouse turning the player's view directly, as in a PC shooter, instead of being made into
