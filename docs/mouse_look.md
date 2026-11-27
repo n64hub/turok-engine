@@ -68,10 +68,13 @@ stick apart from the look code, so neither changes.
 | Turok 2 | func_0024EF70 | 0x0024F14C | s2 + 0x50 | s1 + 0xAC8 | a1; limits at s0 + 0x10, + 0x14 |
 | Turok 3 | func_002CF978 | 0x002CFBF4 | s2 + 0x6C | s0 + 0xDD0 | a1; limits at s1 + 0x10, + 0x14 |
 | Turok 1 | func_80052B1C | 0x80053688 | *(sp + 0xB4) + 0x64 | s0 + 0x70 | s0 + 0x68; limits -1.3614, pi/2 |
+| Turok 1, in water | func_80052B1C | 0x800533E4, 0x80053478, 0x80053530 | *(sp + 0xB4) + 0x64 | s0 + 0x70 | s0 + 0x68; limits ±pi/2, ±80°, ±80° |
 
-These are the on-foot looks. Swimming and the vehicles have their own, which aren't hooked, so the mouse does not
-turn the view there. Turok 3's ladder look is hooked too (below). Turok 1 has already read its pitch into f12 when the hook runs, so its hook reads it again after
-the call.
+These are the on-foot looks, and Turok 1's in water. Turok 1's look code picks its look by where the player is
+against the water, and each of its three water looks makes its own target from the stick and goes past the on-foot
+hook, so each has a hook of its own. Turok 2's and Turok 3's swimming and the vehicles have their own looks, which
+aren't hooked, so the mouse does not turn the view there, but for Turok 3's ladders (below). Turok 1 has already read its pitch into f12 when its hooks
+run, and its water hooks the target into f14, so they read them again after the call.
 
 A count turns the view 0.12 degrees at 100% Mouse Sensitivity, so the default of 50% turns a full circle in 6000
 counts.
