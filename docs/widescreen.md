@@ -188,7 +188,11 @@ frame (above) neither writes anything, so the weapon is at the new shot at once,
 base, where such a group tore the level, this group holds only the weapon's few matrices, which all move with the
 camera.
 
-RESULTS_PLACEHOLDER
+Measured in Turok 1's first level at Framerate Manual 60, a scripted mouse turning the view in flicks from rest and
+in reversals every frame of the game's, with the weapon's place found in each presented frame by matching a patch of
+the hand: without the group, 13 of 301 frames between the game's own had the hand more than 8 pixels (of 480) off
+the midpoint of the frames either side, up to 45; with it, none more than 1, while the scene behind it turned 26 to 48
+pixels and more from where it started.
 
 RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs to find it at the
 VI's origin (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second
