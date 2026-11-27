@@ -28,6 +28,7 @@ namespace {
     uint32_t dl_opcode = 0xDE;   // the microcode's G_DL
     uint32_t frame_start = 0;   // the head where this frame's display list starts
     bool hud_open = false;      // hud_begin wrote its commands, so hud_end closes them
+    bool weapon_open = false;   // weapon_begin opened its matrix group, so weapon_end pops it
     uint32_t cut_slot = 0;      // where frame_begin left room in this frame's display list for a camera cut's commands
 
     constexpr uint32_t kOriginLeft = 0x0;   // G_EX_ORIGIN_LEFT
@@ -288,6 +289,7 @@ void turok::set_display_list_head(uint32_t address, Microcode microcode) {
 extern "C" void turok_frame_begin(uint8_t* rdram) {
     frame_start = head_var != 0 ? (uint32_t)MEM_W(0, (gpr)(int32_t)head_var) : 0;
     hud_open = false;
+    weapon_open = false;
     cut_slot = 0;
     if (frame_start != 0 && (frame_start & 7) == 0 && interpolating()) {
         Writer dl{ rdram, frame_start };
@@ -484,5 +486,56 @@ extern "C" void turok_hud_end(uint8_t* rdram) {
     if (hud_cimg.w0 != 0) {
         dl.new_pair(hud_cimg);
     }
+    dl.finish();
+}
+
+// The player's weapon, while RT64 interpolates. Turok 1 draws the weapon in its hands with matrices in the world's
+// space, so they move as far as the camera does, and RT64 tells a matrix's movement from a jump by its speed: one that
+// starts from rest, or turns back, it draws at once where it ends, where it moves on smoothly from another. A flick of
+// the mouse from still is such a start, and the weapon was drawn a whole frame of the turn ahead while the camera
+// turned half of it, a jolt sideways; while the screen shakes the matrices turn back every frame, some snapped and some
+// moved, and the weapon's parts came apart. Around it, a matrix group for the modelview whose position and rotation are
+// always moved smoothly (G_EX_COMPONENT_INTERPOLATE, the rest RT64's own): the weapon moves with the camera it is drawn
+// by. A camera cut's frame leaves it out, so the weapon is at the new shot at once, with the camera (turok_frame_end).
+// weapon_end does nothing unless weapon_begin wrote its group.
+extern "C" void turok_weapon_begin(uint8_t* rdram) {
+    if (weapon_open) {
+        return;
+    }
+    uint32_t head;
+    if (!interpolating() || camera_cut || !head_valid(rdram, &head)) {
+        return;
+    }
+    constexpr uint32_t kSkip = 0, kInterpolate = 1, kAuto = 2; // G_EX_COMPONENT_*
+    constexpr uint32_t kParams = 1 |                                           // G_EX_PUSH, G_MTX_MODELVIEW
+                                 (1 << 2) |                                    // G_EX_COMPONENT_DECOMPOSE
+                                 (kInterpolate << 3) | (kInterpolate << 5) |   // position, rotation
+                                 (kAuto << 7) | (kAuto << 9) | (kAuto << 11) | // scale, skew, perspective
+                                 (kSkip << 13) |                               // vertices
+                                 (kAuto << 15) |                               // tiles
+                                 (1 << 17) |                                   // G_EX_ORDER_AUTO
+                                 (kAuto << 20) |                               // aspect
+                                 (kSkip << 22) |                               // texture coordinates
+                                 (kAuto << 24);                                // look-at
+    Writer dl{ rdram, head };
+    dl.enable();
+    dl.cmd(0x6400000C, 0xFFFFFFFF); // gEXMatrixGroup(G_EX_ID_AUTO, ...): RT64 matches its matrices to the last frame's
+    dl.cmd(kParams, 0);             //   by their calls, as it does outside a group
+    dl.finish();
+    weapon_open = true;
+}
+
+extern "C" void turok_weapon_end(uint8_t* rdram) {
+    if (!weapon_open) {
+        return;
+    }
+    weapon_open = false;
+    uint32_t head;
+    if (!head_valid(rdram, &head)) {
+        return;
+    }
+    Writer dl{ rdram, head };
+    dl.enable();
+    dl.cmd(0x6400000D, 1); // gEXPopMatrixGroup(G_MTX_MODELVIEW)
     dl.finish();
 }

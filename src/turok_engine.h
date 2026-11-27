@@ -97,6 +97,10 @@ extern "C" {
     void turok_frame_end(uint8_t* rdram);
     void turok_hud_begin(uint8_t* rdram);
     void turok_hud_end(uint8_t* rdram);
+    // widescreen.cpp, from a game's hooks before and after the weapon in the player's hands: a matrix group that moves
+    // it smoothly while RT64 interpolates, but for a camera cut's frame; nothing otherwise.
+    void turok_weapon_begin(uint8_t* rdram);
+    void turok_weapon_end(uint8_t* rdram);
     // widescreen.cpp: the camera's float view-projection matrix (at matrix), once the display list's copy is made:
     // held up to the last frame's for a camera cut, and widened for its culling.
     void turok_widen_culling(uint8_t* rdram, uint32_t matrix);
