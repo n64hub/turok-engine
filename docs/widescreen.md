@@ -167,6 +167,29 @@ drawn with. The frames either side draw none, and neither do the opening's other
 a second, so the screen is black for about 67 ms there at any Framerate setting, and back-to-back captures show 2-7
 black ones. The framebuffer it is drawn in is the one the VI shows and the one RT64 presents, as for every other frame.
 
+### The weapon
+
+Turok 1 draws the weapon in the player's hands with modelview matrices in the world's space: each is built from the
+camera's camera-to-world matrix and the weapon's offset in front of the eye (func_80018A84), and drawn with the view's
+projection, so on screen it stays where it is while both move as far as the camera does. RT64's matching takes a
+matrix that moves from rest, or turns back, for a jump, and draws it at once where the game's frame puts it, where one
+already moving it moves smoothly. A turn of the mouse from still is such a start: the frames between the game's own
+drew the weapon a whole frame of the turn ahead of a camera turned half of it, a jolt sideways at each flick (20 to 48
+pixels of a 480-wide picture at Framerate Manual 60). While the screen shakes, the matrices turn back every frame, some
+of the weapon's parts were snapped and some moved, and they came apart. The camera itself is always interpolated, so
+the stick, which starts a turn slowly, showed it far less.
+
+So a game hooks the weapon's draw: `turok_weapon_begin` before it and `turok_weapon_end` after, every way out of
+it. While RT64 interpolates, the first writes a matrix group for the modelview whose position and rotation always
+interpolate (`gEXMatrixGroup`, `G_EX_ID_AUTO`, `G_EX_COMPONENT_INTERPOLATE`; the rest as RT64 does without one),
+and the second pops it. With the id left to RT64, its matrices are still matched to the last frame's by their calls,
+as without the group: only the snap is gone, so the weapon moves with the camera that draws it. On a camera cut's
+frame (above) neither writes anything, so the weapon is at the new shot at once, as the camera is. Unlike the frame's
+base, where such a group tore the level, this group holds only the weapon's few matrices, which all move with the
+camera.
+
+RESULTS_PLACEHOLDER
+
 RT64 interpolates a frame only when the framebuffer the VI shows is one the frame drew, so it needs to find it at the
 VI's origin (What a game needs first) as much as widescreen does. Turok 3's page presented the game's own 30 a second
 until it did; now its desktop build presents 57-60 a second at Framerate Display on a 59 Hz display (30 at Original),
