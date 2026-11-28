@@ -260,18 +260,40 @@ bool turok::widescreen_active() {
     return ultramodern::renderer::get_graphics_config().ar_option == ultramodern::renderer::AspectRatio::Expand;
 }
 
-// How many times wider than 4:3 the culling lets through with Expand: the picture, which RT64 widens to the window's
-// aspect ratio (never narrower than 4:3), and a tenth of its width past each side. The margin is for the frames RT64
-// draws between the game's: they are drawn from the newer frame's display lists with the camera partway back to the
-// older one's view, so while the player turns their trailing edge can show a little of what the newer frame culled.
-// The culling was a fixed 21:9 before, whatever the window: a 4:3 window drew the world out past its sides where
-// nobody sees it, and a 32:9 one stopped drawing it a good way short of its edges.
-static float culling_scale() {
-    constexpr float kMargin = 1.2f;
-    int width = 0, height = 0;
-    recompui::get_window_size(width, height);
-    const float picture = (width > 0 && height > 0) ? (float(width) / float(height)) / (4.0f / 3.0f) : 1.0f;
-    return std::max(1.0f, picture) * kMargin;
+// How far the culling reaches past the picture's sides, as an angle off the camera's heading, and how far it reaches at
+// most. The margin is for the frames RT64 draws between the game's: they are drawn from the newer frame's display
+// lists with the camera partway back to the older one's view, up to a whole frame's turn back at a high refresh rate,
+// so while the player turns their trailing edge shows what the newer frame culled past its own sides. Turok 2's stick
+// turns 7.6 degrees a frame of the game's own (about 28 a second), and its rooms are chosen more coarsely than the
+// pyramid they are tested against: on the Port of Adia's dock, at a Field of View of 115%, a room whose nearest wall
+// lay 43.6 degrees off the camera's heading wasn't drawn with the pyramid's sides at 49 degrees, and the frames between
+// showed the fog colour down the trailing edge for a frame, two to four times a turn. A margin of a tenth of the
+// picture's width (5-7 degrees) left that; 20 degrees doesn't.
+constexpr float kCullingMarginDegrees = 20.0f;
+constexpr float kCullingMaxDegrees = 80.0f;
+
+// How many times wider than its own a view's culling is let through: own is the tangent of half its own width (the
+// 4:3 view the game culls to), and it is widened to the picture, which RT64 widens to the window's aspect ratio with
+// Expand (never narrower than 4:3), and the margin past each side. With Expand off it is widened by the margin alone
+// while frames are drawn between the game's, and not at all at the game's own rate. The culling was a fixed 21:9
+// before, whatever the window: a 4:3 window drew the world out past its sides where nobody sees it, and a 32:9 one
+// stopped drawing it a good way short of its edges.
+static float culling_scale(float own) {
+    const bool wide = turok::widescreen_active();
+    if (!(own > 0.0f) || (!wide && !interpolating())) {
+        return 1.0f;
+    }
+    float picture = 1.0f;
+    if (wide) {
+        int width = 0, height = 0;
+        recompui::get_window_size(width, height);
+        if (width > 0 && height > 0) {
+            picture = std::max(1.0f, (float(width) / float(height)) / (4.0f / 3.0f));
+        }
+    }
+    constexpr float kRadians = 3.14159265f / 180.0f;
+    const float half = std::min(std::atan(own * picture) + kCullingMarginDegrees * kRadians, kCullingMaxDegrees * kRadians);
+    return std::max(1.0f, std::tan(half) / own);
 }
 
 void turok::set_display_list_head(uint32_t address, Microcode microcode) {
@@ -305,17 +327,29 @@ extern "C" void turok_frame_begin(uint8_t* rdram) {
 // camera's, which it also converts for the display list), so whatever is outside the 4:3 view isn't drawn, and the
 // sides of a widened picture are missing it. Once the display list's copy is made, the float matrix's x column is
 // scaled so its view is as wide as the window and a margin (culling_scale()): the picture is unchanged and the culling
-// lets through what the window shows. First, at any width, the matrix's view is held up to the last frame's for a camera
+// lets through what the window shows. The view's own half width is its w column's length over its x column's (clip x
+// equals w at its side), rows 0-2. First, at any width, the matrix's view is held up to the last frame's for a camera
 // cut (note_camera).
 extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
     if (matrix == 0) {
         return;
     }
     note_camera(rdram, matrix);
-    if (!turok::widescreen_active()) {
+    float x = 0.0f, w = 0.0f;
+    for (uint32_t row = 0; row < 3; row++) {
+        float m[4];
+        for (uint32_t column = 0; column < 4; column++) {
+            uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)(matrix + row * 16 + column * 4));
+            std::memcpy(&m[column], &bits, sizeof(float));
+        }
+        x += m[0] * m[0];
+        w += m[3] * m[3];
+    }
+    const float scale = x > 0.0f ? culling_scale(std::sqrt(w / x)) : 1.0f;
+    if (scale == 1.0f) {
         return;
     }
-    const float kScale = 1.0f / culling_scale();
+    const float kScale = 1.0f / scale;
     for (uint32_t row = 0; row < 4; row++) {
         uint32_t a = matrix + row * 16; // [row][0]: clip x = sum of v[row] * m[row][0]
         float f;
@@ -329,15 +363,30 @@ extern "C" void turok_widen_culling(uint8_t* rdram, uint32_t matrix) {
 
 // The level's own culling. Apart from the matrix, the camera makes a view pyramid in its own space, its apex at the eye
 // and its far corners from the field of view, which it then moves into the world and takes its side planes and bounding
-// box from: the level's rooms are chosen against that. Turok 2's is 4:3 and a third wider than its view, so a picture
-// wider than about 16:9 had the level missing at its sides, whatever the matrix let through. Each point's x (a float,
-// every 12 bytes from points) is scaled as turok_widen_culling scales the matrix, so the pyramid takes in what the
-// window shows.
+// box from: the level's rooms are chosen against that. Turok 2's is 4:3 and a little wider than its view (its far
+// corners' x over their depth 0.598 at the game's own field of view, where the view's half width is 0.570), so a
+// widened picture had the level missing at its sides, whatever the matrix let through. Each point's x (a float, every
+// 12 bytes from points, the eye's 0) is scaled as turok_widen_culling scales the matrix, from the pyramid's own half
+// width, a far corner's x over its depth, so the pyramid takes in what the window shows.
 extern "C" void turok_widen_frustum(uint8_t* rdram, uint32_t points, uint32_t count) {
-    if (!turok::widescreen_active() || points == 0) {
+    if (points == 0) {
         return;
     }
-    const float kScale = culling_scale();
+    float own = 0.0f;
+    for (uint32_t i = 0; i < count && own == 0.0f; i++) {
+        float p[3];
+        for (uint32_t k = 0; k < 3; k++) {
+            uint32_t bits = (uint32_t)MEM_W(0, (gpr)(int32_t)(points + i * 12 + k * 4));
+            std::memcpy(&p[k], &bits, sizeof(float));
+        }
+        if (p[2] != 0.0f) {
+            own = std::fabs(p[0] / p[2]);
+        }
+    }
+    const float kScale = culling_scale(own);
+    if (kScale == 1.0f) {
+        return;
+    }
     for (uint32_t i = 0; i < count; i++) {
         uint32_t a = points + i * 12;
         float f;

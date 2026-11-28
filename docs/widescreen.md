@@ -205,21 +205,28 @@ The games leave out whatever lies outside their own 4:3 view, so a widened pictu
 walls stopping short of the window's edge while the camera turns. They test it against the camera's float
 view-projection matrix, from which they also make the display list's. A game hooks its camera after that copy is made
 and calls `turok_widen_culling` with the float matrix's address: its x column is scaled to a view as wide as the window
-(RT64 widens the picture to the window's aspect ratio with Expand, never narrower than 4:3) and a tenth of the picture's
-width past each side, so the picture is as before and the culling lets through what the window shows. The margin is
-for the frames RT64 draws between the game's, from the newer frame's display lists with the camera partway back to the
-older one's view: while the player turns, their trailing edge can show a little of what the newer frame culled. Only
-while Expand is on. It was a fixed 21:9 until the games' 2a sides were checked against a 4:3 window: a 4:3 window then
+(RT64 widens the picture to the window's aspect ratio with Expand, never narrower than 4:3) and 20 degrees past each
+side, at most 80 degrees from the view's heading, so the picture is as before and the culling lets through what the
+window shows. The margin is for the frames RT64 draws between the game's, from the newer frame's display lists with the
+camera partway back to the older one's view: while the player turns, their trailing edge shows what lay outside the
+newer frame's view. Turok 2's stick turns its camera 7.6 degrees a game frame, so at 28 a second on a 59 Hz display the
+frame between is 3.8 degrees back, and on a faster display it can be nearly a whole step. A margin of a tenth of the
+picture's width, 5 to 7 degrees, left the fog colour down the trailing edge for a frame, two to four times in a full
+turn at Turok 2's Field of View 115% on Port of Adia's dock: a room's edge 43.6 degrees from the newer heading, with the
+pyramid's sides (below) at 49, chosen rooms being coarser than the planes they are chosen against. The angle is worked
+out from each view's own width, so a wider field of view gets the same margin. It applies with Expand on, and with
+it off while RT64 draws frames between the game's (Framerate not Original), which have the same trailing edge at 4:3. It was a fixed 21:9 until the games' 2a sides were checked against a 4:3 window: a 4:3 window then
 drew the world out past its sides where nobody sees it, as much as a 32:9 one, whose picture went on a good way past
 where the world stopped being drawn (a check of the frames by machine, Turok 1's first level x1.00).
 
 The level is culled a second way, apart from that matrix. The camera makes a view pyramid in its own space, five points
 (the eye, then four far corners from the field of view, 4:3), moves it into the world and takes from it the side
-planes and bounding box the level's rooms are chosen against. Turok 2's is a third wider than its view, so the matrix
+planes and bounding box the level's rooms are chosen against. Turok 2's is only a little wider than its view (its far
+corners' x over their depth is 0.598 at the game's own field of view, where the view's is 0.570), so the matrix
 alone left a 21:9 picture missing the level past about 16:9: walls and water stopping on one vertical line, the room
 past a corner not drawn at all, the fog colour showing instead. A game hooks its camera once the points are made and
 before they are moved, and calls `turok_widen_frustum` with their address and count: each point's x is scaled as the
-matrix's x column is. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`;
+matrix's x column is, from the pyramid's own width. Turok 2's camera (us.toml) makes them at its stack's 0x3F8 and moves them with `func_0020F908`;
 Turok 3's makes them in `func_0028E8B8`, at its stack's 0x18, and moves them with `func_002628E8`. Turok 1's camera
 (`func_80037E3C`) makes them at its stack's 0xC0 and moves them a point a turn of a loop (`func_800156A4`), whose head
 is the first place after they are made, so its hook widens them on the loop's first turn only. Without it Turok 1's
